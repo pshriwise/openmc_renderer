@@ -3,8 +3,11 @@
 
 
 int main(int argc, char* argv[]) {
-  openmc_init(argc, argv, nullptr);
-  openmc_run();
-  openmc_finalize();
+  int err;
+
+  err = openmc_init(argc, argv, nullptr);
+  err = openmc_plot_geometry();
+  err = openmc_finalize();
+
   return 0;
 }
