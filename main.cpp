@@ -93,55 +93,6 @@ private:
         vec[2] = z;
     }};
 
-// Function to draw a cube
-void drawCube() {
-    glBegin(GL_QUADS);
-
-    // Front face
-    glColor3f(1.0f, 0.0f, 0.0f); // Red
-    glVertex3f(-1.0f, -1.0f,  1.0f);
-    glVertex3f( 1.0f, -1.0f,  1.0f);
-    glVertex3f( 1.0f,  1.0f,  1.0f);
-    glVertex3f(-1.0f,  1.0f,  1.0f);
-
-    // Back face
-    glColor3f(0.0f, 1.0f, 0.0f); // Green
-    glVertex3f(-1.0f, -1.0f, -1.0f);
-    glVertex3f(-1.0f,  1.0f, -1.0f);
-    glVertex3f( 1.0f,  1.0f, -1.0f);
-    glVertex3f( 1.0f, -1.0f, -1.0f);
-
-    // Top face
-    glColor3f(0.0f, 0.0f, 1.0f); // Blue
-    glVertex3f(-1.0f,  1.0f, -1.0f);
-    glVertex3f(-1.0f,  1.0f,  1.0f);
-    glVertex3f( 1.0f,  1.0f,  1.0f);
-    glVertex3f( 1.0f,  1.0f, -1.0f);
-
-    // Bottom face
-    glColor3f(1.0f, 1.0f, 0.0f); // Yellow
-    glVertex3f(-1.0f, -1.0f, -1.0f);
-    glVertex3f( 1.0f, -1.0f, -1.0f);
-    glVertex3f( 1.0f, -1.0f,  1.0f);
-    glVertex3f(-1.0f, -1.0f,  1.0f);
-
-    // Right face
-    glColor3f(1.0f, 0.0f, 1.0f); // Magenta
-    glVertex3f( 1.0f, -1.0f, -1.0f);
-    glVertex3f( 1.0f,  1.0f, -1.0f);
-    glVertex3f( 1.0f,  1.0f,  1.0f);
-    glVertex3f( 1.0f, -1.0f,  1.0f);
-
-    // Left face
-    glColor3f(0.0f, 1.0f, 1.0f); // Cyan
-    glVertex3f(-1.0f, -1.0f, -1.0f);
-    glVertex3f(-1.0f, -1.0f,  1.0f);
-    glVertex3f(-1.0f,  1.0f,  1.0f);
-    glVertex3f(-1.0f,  1.0f, -1.0f);
-
-    glEnd();
-}
-
 // Global camera instance
 Camera camera;
 bool draggingLeft = false;
@@ -310,10 +261,6 @@ int main(int argc, char* argv[]) {
 
         // Draw the background
         drawBackground(backgroundTexture);
-
-        // Draw the cube
-        // drawCube();
-
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
