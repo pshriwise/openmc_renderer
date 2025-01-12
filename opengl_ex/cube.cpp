@@ -2,12 +2,23 @@
 #include <GL/glu.h>
 #include <iostream>
 
-// Initial rotation and zoom values
-float rotationX = 0.0f;
-float rotationY = 0.0f;
-float zoom = -5.0f;
-bool dragging = false;
-double lastMouseX, lastMouseY;
+// Camera class to manage view parameters
+class Camera {
+public:
+    float rotationX;
+    float rotationY;
+    float zoom;
+    float panX;
+    float panY;
+
+    Camera() : rotationX(0.0f), rotationY(0.0f), zoom(-5.0f), panX(0.0f), panY(0.0f) {}
+
+    void applyTransformations() const {
+        glTranslatef(panX, panY, zoom);
+        glRotatef(rotationX, 1.0f, 0.0f, 0.0f);
+        glRotatef(rotationY, 0.0f, 1.0f, 0.0f);
+    }
+};
 
 // Function to draw a cube
 void drawCube() {
@@ -58,23 +69,43 @@ void drawCube() {
     glEnd();
 }
 
+// Global camera instance
+Camera camera;
+bool draggingLeft = false;
+bool draggingMiddle = false;
+double lastMouseX, lastMouseY;
+
 // Mouse button callback
 void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
     if (button == GLFW_MOUSE_BUTTON_LEFT) {
         if (action == GLFW_PRESS) {
-            dragging = true;
+            draggingLeft = true;
             glfwGetCursorPos(window, &lastMouseX, &lastMouseY);
         } else if (action == GLFW_RELEASE) {
-            dragging = false;
+            draggingLeft = false;
+        }
+    }
+    if (button == GLFW_MOUSE_BUTTON_MIDDLE) {
+        if (action == GLFW_PRESS) {
+            draggingMiddle = true;
+            glfwGetCursorPos(window, &lastMouseX, &lastMouseY);
+        } else if (action == GLFW_RELEASE) {
+            draggingMiddle = false;
         }
     }
 }
 
 // Mouse motion callback
 void cursorPositionCallback(GLFWwindow* window, double xpos, double ypos) {
-    if (dragging) {
-        rotationX += (ypos - lastMouseY) * 0.5f;
-        rotationY += (xpos - lastMouseX) * 0.5f;
+    if (draggingLeft) {
+        camera.rotationX += (ypos - lastMouseY) * 0.5f;
+        camera.rotationY += (xpos - lastMouseX) * 0.5f;
+        lastMouseX = xpos;
+        lastMouseY = ypos;
+    }
+    if (draggingMiddle) {
+        camera.panX += (xpos - lastMouseX) * 0.01f;
+        camera.panY -= (ypos - lastMouseY) * 0.01f;
         lastMouseX = xpos;
         lastMouseY = ypos;
     }
@@ -82,7 +113,7 @@ void cursorPositionCallback(GLFWwindow* window, double xpos, double ypos) {
 
 // Scroll callback
 void scrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
-    zoom += yoffset;
+    camera.zoom += yoffset;
 }
 
 int main() {
@@ -111,9 +142,7 @@ int main() {
     while (!glfwWindowShouldClose(window)) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glLoadIdentity();
-        glTranslatef(0.0f, 0.0f, zoom);
-        glRotatef(rotationX, 1.0f, 0.0f, 0.0f);
-        glRotatef(rotationY, 0.0f, 1.0f, 0.0f);
+        camera.applyTransformations();
 
         drawCube();
 
