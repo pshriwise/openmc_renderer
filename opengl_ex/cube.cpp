@@ -116,6 +116,15 @@ void scrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
     camera.zoom += yoffset;
 }
 
+// Framebuffer size callback to adjust the viewport
+void framebufferSizeCallback(GLFWwindow* window, int width, int height) {
+    glViewport(0, 0, width, height);
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    gluPerspective(45.0, static_cast<double>(width) / height, 1.0, 500.0);
+    glMatrixMode(GL_MODELVIEW);
+}
+
 int main() {
     if (!glfwInit()) {
         std::cerr << "Failed to initialize GLFW" << std::endl;
@@ -133,11 +142,14 @@ int main() {
     glfwSetMouseButtonCallback(window, mouseButtonCallback);
     glfwSetCursorPosCallback(window, cursorPositionCallback);
     glfwSetScrollCallback(window, scrollCallback);
+    glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
 
     glEnable(GL_DEPTH_TEST);
-    glMatrixMode(GL_PROJECTION);
-    gluPerspective(45.0, 800.0 / 600.0, 1.0, 500.0);
-    glMatrixMode(GL_MODELVIEW);
+
+    // Set initial viewport and projection
+    int width, height;
+    glfwGetFramebufferSize(window, &width, &height);
+    framebufferSizeCallback(window, width, height);
 
     while (!glfwWindowShouldClose(window)) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
