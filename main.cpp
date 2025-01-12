@@ -1,13 +1,9 @@
+#include <iostream>
 
-#include "openmc/capi.h"
-
+#include "plotter.h"
 
 int main(int argc, char* argv[]) {
-  int err;
-
-  err = openmc_init(argc, argv, nullptr);
-  err = openmc_plot_geometry();
-  err = openmc_finalize();
-
+  auto openmc_plotter = OpenMCPlotter(argc, argv);
+  openmc_plotter.create_image();
   return 0;
 }
