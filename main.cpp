@@ -1,12 +1,12 @@
 #include <iostream>
-
 #include "plotter.h"
-
 #include <GLFW/glfw3.h>
 #include <GL/glu.h>
-#include <iostream>
 #include <vector>
-
+#include <xtensor/xarray.hpp>
+#include <xtensor/xio.hpp>
+#include <xtensor/xrandom.hpp>
+#include <xtensor/xview.hpp>
 
 // Camera class to manage view parameters
 class Camera {
@@ -17,14 +17,81 @@ public:
     float panX;
     float panY;
 
-    Camera() : rotationX(0.0f), rotationY(0.0f), zoom(-5.0f), panX(0.0f), panY(0.0f) {}
+    // New fields
+    double fov;
+    openmc::Position position;
+    openmc::Position lookAt;
+    openmc::Position upVector;
+
+    Camera()
+        : rotationX(0.0f), rotationY(0.0f), zoom(-5.0f), panX(0.0f), panY(0.0f),
+          fov(45.0)  {
+            position = {10, 10, 10};
+            lookAt = {0.0, 0.0, 0.0};
+            upVector = {0.0, 0.0, 1.0};
+
+          }
 
     void applyTransformations() const {
+        glLoadIdentity();
+        gluLookAt(position[0], position[1], position[2],
+                  lookAt[0], lookAt[1], lookAt[2],
+                  upVector[0], upVector[1], upVector[2]);
         glTranslatef(panX, panY, zoom);
         glRotatef(rotationX, 1.0f, 0.0f, 0.0f);
         glRotatef(rotationY, 0.0f, 1.0f, 0.0f);
     }
-};
+
+    void updateView(int width, int height) {
+        glMatrixMode(GL_PROJECTION);
+        glLoadIdentity();
+        gluPerspective(fov, static_cast<double>(width) / height, 1.0, 500.0);
+        glMatrixMode(GL_MODELVIEW);
+    }
+
+openmc::Position getTransformedPosition() const {
+        openmc::Position transformedPosition = position;
+        applyPanAndRotation(transformedPosition);
+        return transformedPosition;
+    }
+
+    openmc::Position getTransformedLookAt() const {
+        openmc::Position transformedLookAt = lookAt;
+        applyPanAndRotation(transformedLookAt);
+        return transformedLookAt;
+    }
+
+    openmc::Position getTransformedUpVector() const {
+        openmc::Position transformedUp = upVector;
+        applyPanAndRotation(transformedUp);
+        return transformedUp;
+    }
+
+private:
+    void applyPanAndRotation(openmc::Position& vec) const {
+        // Apply zoom
+        vec[2] += zoom;
+
+        // Apply pan
+        vec[0] += panX;
+        vec[1] += panY;
+
+        // Apply rotation around Y-axis (yaw)
+        double cosY = std::cos(rotationY * M_PI / 180.0);
+        double sinY = std::sin(rotationY * M_PI / 180.0);
+        double x = vec[0] * cosY - vec[2] * sinY;
+        double z = vec[0] * sinY + vec[2] * cosY;
+        vec[0] = x;
+        vec[2] = z;
+
+        // Apply rotation around X-axis (pitch)
+        double cosX = std::cos(rotationX * M_PI / 180.0);
+        double sinX = std::sin(rotationX * M_PI / 180.0);
+        double y = vec[1] * cosX - vec[2] * sinX;
+        z = vec[1] * sinX + vec[2] * cosX;
+        vec[1] = y;
+        vec[2] = z;
+    }};
 
 // Function to draw a cube
 void drawCube() {
@@ -81,6 +148,18 @@ bool draggingLeft = false;
 bool draggingMiddle = false;
 double lastMouseX, lastMouseY;
 
+// Function to update the texture with new image data
+void updateTexture(GLuint texture, const openmc::ImageData& imageData) {
+    auto& transposedData = imageData;
+    // auto transposedData = xt::transpose(imageData, {1, 0});
+
+    int width = transposedData.shape()[0];
+    int height = transposedData.shape()[1];
+
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, transposedData.data());
+}
+
 // Mouse button callback
 void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
     if (button == GLFW_MOUSE_BUTTON_LEFT) {
@@ -125,15 +204,13 @@ void scrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
 // Framebuffer size callback to adjust the viewport
 void framebufferSizeCallback(GLFWwindow* window, int width, int height) {
     glViewport(0, 0, width, height);
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    gluPerspective(45.0, static_cast<double>(width) / height, 1.0, 500.0);
-    glMatrixMode(GL_MODELVIEW);
+    camera.updateView(width, height);
 }
 
 // Function to create a texture from ImageData
 GLuint createTextureFromImageData(const openmc::ImageData& imageData) {
-    auto transposedData = xt::transpose(imageData, {1, 0});
+    auto& transposedData = imageData;
+    // auto transposedData = xt::transpose(imageData, {1, 0});
 
     int width = transposedData.shape()[0];
     int height = transposedData.shape()[1];
@@ -182,9 +259,16 @@ void drawBackground(GLuint texture) {
     glEnable(GL_DEPTH_TEST);
 }
 
+void transferCameraInfo(OpenMCPlotter& plotter, const Camera& camera) {
+    plotter.set_camera_position(camera.getTransformedPosition());
+    plotter.set_look_at(camera.getTransformedLookAt());
+    plotter.set_up_vector(camera.getTransformedUpVector());
+    plotter.set_field_of_view(camera.fov);
+}
+
 int main(int argc, char* argv[]) {
-  auto openmc_plotter = OpenMCPlotter(argc, argv);
-  auto image = openmc_plotter.create_image();
+    auto openmc_plotter = OpenMCPlotter(argc, argv);
+    auto image = openmc_plotter.create_image();
 
     if (!glfwInit()) {
         std::cerr << "Failed to initialize GLFW" << std::endl;
@@ -217,13 +301,18 @@ int main(int argc, char* argv[]) {
     while (!glfwWindowShouldClose(window)) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+        camera.applyTransformations();
+        transferCameraInfo(openmc_plotter, camera);
+
+        // Update the texture with new image data if the camera has changed
+        auto newImageData = openmc_plotter.create_image(); // Assume this generates a new image based on the camera
+        updateTexture(backgroundTexture, newImageData);
+
         // Draw the background
         drawBackground(backgroundTexture);
 
         // Draw the cube
-        glLoadIdentity();
-        camera.applyTransformations();
-        drawCube();
+        // drawCube();
 
         glfwSwapBuffers(window);
         glfwPollEvents();

@@ -36,6 +36,33 @@ public:
     return plot_;
   }
 
+  openmc::PhongPlot* plot() {
+    return plot_;
+  }
+
+  void set_camera_position(openmc::Position position) {
+    plot()->camera_position_ = position;
+  }
+
+  void set_look_at(openmc::Position look_at) {
+    plot()->look_at_ = look_at;
+  }
+
+  void set_up_vector(openmc::Direction up) {
+    plot()->up_ = up;
+  }
+
+  void set_field_of_view(double fov) {
+    plot()->horizontal_field_of_view_ = fov;
+  }
+
 private:
-  const openmc::PhongPlot* plot_;
+  openmc::PhongPlot* plot_;
 };
+
+// void transferCameraInfo(OpenMCPlotter& plotter, const Camera& camera) {
+//     plotter.set_camera_position(camera.position);
+//     plotter.set_look_at(camera.lookAt);
+//     plotter.set_up_vector(camera.upVector);
+//     plotter.set_field_of_view(camera.fov);
+// }
