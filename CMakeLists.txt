@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16 FATAL_ERROR)
-project(openmc C CXX)
+project(openmc_renderer C CXX)
 
 
 # Enable correct usage of CXX_EXTENSIONS
@@ -14,9 +14,15 @@ endif()
 
 find_package(OpenMC REQUIRED)
 
+
+# Find the required packages
+find_package(OpenGL REQUIRED)
+find_package(GLUT REQUIRED)
+find_package(glfw3 REQUIRED)
+
 add_executable(omc-render main.cpp)
 
-target_link_libraries(omc-render OpenMC::libopenmc)
+target_link_libraries(omc-render OpenMC::libopenmc OpenGL::GL GLUT::GLUT glfw GLU)
 target_compile_features(omc-render PUBLIC cxx_std_14)
 set(CMAKE_CXX_FLAGS "-pedantic-errors")
 
