@@ -22,6 +22,7 @@ public:
     openmc::Position position;
     openmc::Position lookAt;
     openmc::Position upVector;
+    openmc::Position lightPosition {0, 10 , 10};
 
     Camera()
         : rotationX(0.0f), rotationY(0.0f), zoom(-5.0f), panX(0.0f), panY(0.0f),
@@ -29,7 +30,6 @@ public:
             position = {10, 10, 10};
             lookAt = {0.0, 0.0, 0.0};
             upVector = {0.0, 0.0, 1.0};
-
           }
 
     void applyTransformations() const {
@@ -214,6 +214,7 @@ void transferCameraInfo(OpenMCPlotter& plotter, const Camera& camera) {
     plotter.set_camera_position(camera.getTransformedPosition());
     plotter.set_look_at(camera.getTransformedLookAt());
     plotter.set_up_vector(camera.getTransformedUpVector());
+    plotter.set_light_position(camera.lightPosition);
     plotter.set_field_of_view(camera.fov);
 }
 
@@ -248,6 +249,8 @@ int main(int argc, char* argv[]) {
 
     // Create the background texture from ImageData
     GLuint backgroundTexture = createTextureFromImageData(image);
+
+    transferCameraInfo(openmc_plotter, camera);
 
     while (!glfwWindowShouldClose(window)) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
