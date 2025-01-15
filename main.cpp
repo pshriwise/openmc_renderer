@@ -8,6 +8,13 @@
 #include <xtensor/xrandom.hpp>
 #include <xtensor/xview.hpp>
 
+#include "imgui.h"
+#include "imgui_impl_glfw.h"
+#include "imgui_impl_opengl3.h"
+#include "imguiwrap.h"
+#include "imguiwrap.dear.h"
+#include "imguiwrap.helpers.h"
+
 // Camera class to manage view parameters
 class Camera {
 public:
@@ -240,6 +247,17 @@ int main(int argc, char* argv[]) {
     glfwSetScrollCallback(window, scrollCallback);
     glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
 
+   // Create ImGui context
+   ImGui::CreateContext();
+   ImGuiIO& io = ImGui::GetIO(); (void)io;
+
+   // Setup Dear ImGui style
+   ImGui::StyleColorsDark();
+
+   ImGui_ImplGlfw_InitForOpenGL(window, true);
+   ImGui_ImplOpenGL3_Init("#version 460"); // Replace with your OpenGL version
+
+
     glEnable(GL_DEPTH_TEST);
 
     // Set initial viewport and projection
@@ -252,11 +270,22 @@ int main(int argc, char* argv[]) {
 
     transferCameraInfo(openmc_plotter, camera);
 
+
+
     while (!glfwWindowShouldClose(window)) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         camera.applyTransformations();
         transferCameraInfo(openmc_plotter, camera);
+
+        // Start the Dear ImGui frame
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+        // Create your ImGui UI
+        ImGui::Begin("Hello, world!");
+        ImGui::Text("This is some useful text.");
+        ImGui::End();
 
         // Update the texture with new image data if the camera has changed
         auto newImageData = openmc_plotter.create_image(); // Assume this generates a new image based on the camera
@@ -264,9 +293,20 @@ int main(int argc, char* argv[]) {
 
         // Draw the background
         drawBackground(backgroundTexture);
-        glfwSwapBuffers(window);
+
         glfwPollEvents();
+
+        //  // Render Dear ImGui
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+
+        glfwSwapBuffers(window);
     }
+
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
 
     glDeleteTextures(1, &backgroundTexture);
     glfwDestroyWindow(window);

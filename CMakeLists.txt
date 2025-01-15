@@ -14,6 +14,9 @@ endif()
 
 find_package(OpenMC REQUIRED)
 
+# Find Imgui
+add_subdirectory(vendor/imguiwrap)
+
 
 # Find the required packages
 find_package(OpenGL REQUIRED)
@@ -22,7 +25,8 @@ find_package(glfw3 REQUIRED)
 
 add_executable(omc-render main.cpp)
 
-target_link_libraries(omc-render OpenMC::libopenmc OpenGL::GL GLUT::GLUT glfw GLU)
+target_link_libraries(omc-render PUBLIC OpenMC::libopenmc OpenGL::GL GLUT::GLUT glfw GLU imguiwrap)
+
 target_compile_features(omc-render PUBLIC cxx_std_14)
 set(CMAKE_CXX_FLAGS "-pedantic-errors")
 
