@@ -1,0 +1,6 @@
+[submodule "vendor/imgui"]
+	path = vendor/imgui
+	url = https://github.com/ocornut/imgui
+[submodule "vendor/imguiwrap"]
+	path = vendor/imguiwrap
+	url = https://github.com/kfsone/imguiwrap.git
