@@ -6,7 +6,8 @@
 #include "openmc/plot.h"
 #include "openmc/settings.h"
 
-
+#ifndef OPENMC_PLOTTER_H
+#define OPENMC_PLOTTER_H
 class OpenMCPlotter {
 
 private:
@@ -122,3 +123,5 @@ public:
 private:
   std::unique_ptr<openmc::PhongPlot> plot_;
 };
+
+#endif // include guard

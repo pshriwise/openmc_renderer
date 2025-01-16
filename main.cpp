@@ -15,104 +15,10 @@
 #include "imguiwrap.dear.h"
 #include "imguiwrap.helpers.h"
 
+#include "render.h"
+
 // Camera class to manage view parameters
-class Camera {
-public:
-    float rotationX;
-    float rotationY;
-    float zoom;
-    float panX;
-    float panY;
 
-    // New fields
-    double fov;
-    openmc::Position position;
-    openmc::Position lookAt;
-    openmc::Position upVector;
-    openmc::Position lightPosition {0, 10 , -10};
-
-    Camera()
-        : rotationX(0.0f), rotationY(0.0f), zoom(-5.0f), panX(0.0f), panY(0.0f),
-          fov(45.0)  {
-            position = {10, 10, 10};
-            lookAt = {0.0, 0.0, 0.0};
-            upVector = {0.0, 0.0, 1.0};
-          }
-
-    void applyTransformations() {
-        glLoadIdentity();
-
-        // Adjust position and lookAt with panning
-        openmc::Position adjustedPosition = position;
-        openmc::Position adjustedLookAt = lookAt;
-
-        applyPanAndRotation(adjustedPosition);
-        applyPanAndRotation(adjustedLookAt);
-
-        gluLookAt(adjustedPosition[0], adjustedPosition[1], adjustedPosition[2],
-                adjustedLookAt[0], adjustedLookAt[1], adjustedLookAt[2],
-                upVector[0], upVector[1], upVector[2]);
-    }
-
-    void updateView(int width, int height) {
-        glMatrixMode(GL_PROJECTION);
-        glLoadIdentity();
-        gluPerspective(fov, static_cast<double>(width) / height, 1.0, 500.0);
-        glMatrixMode(GL_MODELVIEW);
-    }
-
-    openmc::Position getTransformedPosition() const {
-        openmc::Position transformedPosition = position + (lookAt - position) * zoom;
-        applyPanAndRotation(transformedPosition);
-        return transformedPosition;
-    }
-
-    openmc::Position getTransformedLookAt() const {
-        openmc::Position transformedLookAt = lookAt;
-        applyPanAndRotation(transformedLookAt);
-        return transformedLookAt;
-    }
-
-    openmc::Position getTransformedUpVector() const {
-        openmc::Position transformedUp = upVector;
-        applyPanAndRotation(transformedUp);
-        return transformedUp;
-    }
-
-private:
-    void applyPanAndRotation(openmc::Position& vec) const {
-        // Calculate the forward vector (camera direction)
-        openmc::Position forward = lookAt - position;
-        forward = forward / forward.norm(); // Normalize
-
-        // Calculate the right vector (cross product of forward and up)
-        openmc::Position right = forward.cross(upVector);
-        right = right / right.norm(); // Normalize
-
-        // Calculate the true up vector (cross product of right and forward)
-        openmc::Position trueUp = right.cross(forward);
-
-        // Apply pan in the view plane
-        vec = vec + panY * right + panX * trueUp;
-
-        // Apply rotation (yaw and pitch)
-        double cosY = std::cos(rotationY * M_PI / 180.0);
-        double sinY = std::sin(rotationY * M_PI / 180.0);
-        double cosX = std::cos(rotationX * M_PI / 180.0);
-        double sinX = std::sin(rotationX * M_PI / 180.0);
-
-        double x = vec[0] * cosY - vec[2] * sinY;
-        double z = vec[0] * sinY + vec[2] * cosY;
-        vec[0] = x;
-        vec[2] = z;
-
-        double y = vec[1] * cosX - vec[2] * sinX;
-        z = vec[1] * sinX + vec[2] * cosX;
-        vec[1] = y;
-        vec[2] = z;
-    }
-
-};
 
 // Global camera instance
 Camera camera;
@@ -295,6 +201,13 @@ void transferCameraInfo(OpenMCPlotter& plotter, const Camera& camera) {
 }
 
 int main(int argc, char* argv[]) {
+
+    auto renderer = std::make_unique<OpenMCRenderer>(argc, argv);
+
+    renderer->render();
+    return 0;
+
+
     auto& openmc_plotter {OpenMCPlotter::get_instance()};
     openmc_plotter.initialize(argc, argv);
     auto image = openmc_plotter.create_image();
