@@ -42,7 +42,6 @@ public:
   }
 
   openmc::ImageData create_image() {
-    plot()->print_info();
     auto img = xt::transpose(plot()->create_image());
     return img;
   }
