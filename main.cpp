@@ -29,7 +29,7 @@ public:
     openmc::Position position;
     openmc::Position lookAt;
     openmc::Position upVector;
-    openmc::Position lightPosition {0, 10 , 10};
+    openmc::Position lightPosition {0, 10 , -10};
 
     Camera()
         : rotationX(0.0f), rotationY(0.0f), zoom(-5.0f), panX(0.0f), panY(0.0f),
@@ -54,16 +54,6 @@ public:
                 upVector[0], upVector[1], upVector[2]);
     }
 
-    // void applyTransformations() const {
-    //     glLoadIdentity();
-    //     gluLookAt(position[0], position[1], position[2],
-    //               lookAt[0], lookAt[1], lookAt[2],
-    //               upVector[0], upVector[1], upVector[2]);
-    //     glTranslatef(panX, panY, zoom);
-    //     glRotatef(rotationX, 1.0f, 0.0f, 0.0f);
-    //     glRotatef(rotationY, 0.0f, 1.0f, 0.0f);
-    // }
-
     void updateView(int width, int height) {
         glMatrixMode(GL_PROJECTION);
         glLoadIdentity();
@@ -71,8 +61,8 @@ public:
         glMatrixMode(GL_MODELVIEW);
     }
 
-openmc::Position getTransformedPosition() const {
-        openmc::Position transformedPosition = position;
+    openmc::Position getTransformedPosition() const {
+        openmc::Position transformedPosition = position + (lookAt - position) * zoom;
         applyPanAndRotation(transformedPosition);
         return transformedPosition;
     }
@@ -122,30 +112,6 @@ private:
         vec[2] = z;
     }
 
-    // void applyPanAndRotation(openmc::Position& vec) const {
-    //     // Apply zoom
-    //     vec[2] += zoom;
-
-    //     // Apply pan
-    //     vec[0] += panX;
-    //     vec[1] += panY;
-
-    //     // Apply rotation around Y-axis (yaw)
-    //     double cosY = std::cos(rotationY * M_PI / 180.0);
-    //     double sinY = std::sin(rotationY * M_PI / 180.0);
-    //     double x = vec[0] * cosY - vec[2] * sinY;
-    //     double z = vec[0] * sinY + vec[2] * cosY;
-    //     vec[0] = x;
-    //     vec[2] = z;
-
-    //     // Apply rotation around X-axis (pitch)
-    //     double cosX = std::cos(rotationX * M_PI / 180.0);
-    //     double sinX = std::sin(rotationX * M_PI / 180.0);
-    //     double y = vec[1] * cosX - vec[2] * sinX;
-    //     z = vec[1] * sinX + vec[2] * cosX;
-    //     vec[1] = y;
-    //     vec[2] = z;
-    // }
 };
 
 // Global camera instance
@@ -189,8 +155,8 @@ void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
 // Mouse motion callback
 void cursorPositionCallback(GLFWwindow* window, double xpos, double ypos) {
     if (draggingLeft) {
-        camera.rotationX += (ypos - lastMouseY) * 0.5f;
-        camera.rotationY += (xpos - lastMouseX) * 0.5f;
+        camera.rotationX -= (ypos - lastMouseY) * 0.5f;
+        camera.rotationY -= (xpos - lastMouseX) * 0.5f;
         lastMouseX = xpos;
         lastMouseY = ypos;
     }
@@ -324,7 +290,6 @@ void updateVisibleMaterials(OpenMCPlotter& plotter) {
 void transferCameraInfo(OpenMCPlotter& plotter, const Camera& camera) {
     plotter.set_camera_position(camera.getTransformedPosition());
     plotter.set_look_at(camera.getTransformedLookAt());
-    // plotter.set_up_vector(camera.getTransformedUpVector());
     plotter.set_light_position(camera.lightPosition);
     plotter.set_field_of_view(camera.fov);
 }
