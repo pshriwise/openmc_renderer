@@ -21,6 +21,8 @@ public:
 
   OpenMCPlotter(OpenMCPlotter const&) = delete;
   void operator=(OpenMCPlotter const&) = delete;
+  OpenMCPlotter(OpenMCPlotter const&&) = delete;
+  void operator=(OpenMCPlotter const&&) = delete;
 
 
   void initialize(int argc, char* argv[]) {
@@ -68,6 +70,12 @@ public:
       plot()->opaque_ids().insert(i);
     }
 
+  }
+
+  void set_color(int32_t id, openmc::RGBColor color) {
+    // have to convert from material ID to index
+    int32_t mat_index = openmc::model::material_map[id];
+    plot()->colors_[mat_index] = color;
   }
 
   void set_material_visibility(int32_t id, bool visibility) {

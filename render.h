@@ -340,42 +340,81 @@ public:
 
   // void displayColorLegend(const std::unordered_map<int32_t, openmc::RGBColor>& colorMap, VisibilityCallback onVisibilityChange = nullptr) {
   void displayColorLegend() {
-      const auto colorMap = openmc_plotter_.color_map();
-      ImGui::Begin("Color Legend");
-      ImGui::Text("Legend:"); // Title of the legend
+    const auto colorMap = openmc_plotter_.color_map();
 
-      for (const auto& [materialID, color] : colorMap) {
-          // Ensure material ID has a visibility entry
-          if (materialVisibility.find(materialID) == materialVisibility.end()) {
-              materialVisibility[materialID] = true; // Default visibility is true
-          }
+    static int selected_material = -1; // Track which material's color is being edited
+    static openmc::RGBColor temp_color = {0, 0, 0}; // Temporary color for editing
 
-          // Convert color values from [0-255] to [0-1] for ImGui
-          float r = color.red / 255.0f;
-          float g = color.green / 255.0f;
-          float b = color.blue / 255.0f;
+    ImGui::Begin("Color Legend");
+    ImGui::Text("Legend:"); // Title of the legend
 
-          // Draw a color square
-          ImGui::ColorButton(("##Color" + std::to_string(materialID)).c_str(), ImVec4(r, g, b, 1.0f), 0, ImVec2(20, 20));
-          ImGui::SameLine();
+    for (const auto& [material_id, color] : colorMap) {
+        // Ensure material ID has a visibility entry
+        if (materialVisibility.find(material_id) == materialVisibility.end()) {
+            materialVisibility[material_id] = true; // Default visibility is true
+        }
 
-          ImGui::Text("Material ID: %d", materialID);
+        // Convert color values from [0-255] to [0-1] for ImGui
+        float r = color.red / 255.0f;
+        float g = color.green / 255.0f;
+        float b = color.blue / 255.0f;
 
-        // Add a visibility checkbox with a callback
-          ImGui::SameLine();
-          bool visibility = materialVisibility[materialID];
-          if (ImGui::Checkbox(("Visible##" + std::to_string(materialID)).c_str(), &visibility)) {
-              // Update visibility in the map
-              materialVisibility[materialID] = visibility;
-          }
-      }
+        // Draw a color square
+        if (ImGui::ColorButton(("##Color" + std::to_string(material_id)).c_str(), ImVec4(r, g, b, 1.0f))) {
+            // Open the color picker when the color is clicked
+            selected_material = material_id;
+            temp_color = color;
+            ImGui::OpenPopup("Edit Color");
+        }
+        ImGui::SameLine();
+
+        ImGui::Text("Material ID: %d", material_id);
+
+      // Add a visibility checkbox with a callback
+        ImGui::SameLine();
+        bool visibility = materialVisibility[material_id];
+        if (ImGui::Checkbox(("Visible##" + std::to_string(material_id)).c_str(), &visibility)) {
+            // Update visibility in the map
+            materialVisibility[material_id] = visibility;
+        }
+    }
+
+    // Color editing modal dialog
+    if (ImGui::BeginPopupModal("Edit Color", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        // Show color picker
+        float temp_r = temp_color.red / 255.0f;
+        float temp_g = temp_color.green / 255.0f;
+        float temp_b = temp_color.blue / 255.0f;
+
+        if (ImGui::ColorEdit3("Material Color", &temp_r)) {
+            // Update temporary color as user interacts
+            temp_color.red = static_cast<uint8_t>(temp_r * 255);
+            temp_color.green = static_cast<uint8_t>(temp_g * 255);
+            temp_color.blue = static_cast<uint8_t>(temp_b * 255);
+        }
+
+        if (ImGui::Button("Save")) {
+            // Save the new color to the color map
+            std::cout << "Saving color for material " << selected_material << std::endl;
+            openmc_plotter_.set_color(selected_material, temp_color);
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::SameLine();
+
+        if (ImGui::Button("Cancel")) {
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::EndPopup();
+    }
 
       ImGui::End();
   }
 
   void updateVisibleMaterials() {
-      for (const auto& [materialID, visibility] : materialVisibility) {
-          openmc_plotter_.set_material_visibility(materialID, visibility);
+      for (const auto& [material_id, visibility] : materialVisibility) {
+          openmc_plotter_.set_material_visibility(material_id, visibility);
       }
   }
 
@@ -397,7 +436,6 @@ public:
 
   // A map to track visibility state for each material
   std::unordered_map<int32_t, bool> materialVisibility;
-
 
   GLFWwindow* window_ {nullptr};
   GLuint texture_;
