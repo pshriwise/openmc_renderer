@@ -28,7 +28,8 @@ public:
 
   openmc::ImageData create_image() {
     plot()->print_info();
-    return plot()->create_image();
+    auto img = xt::transpose(plot()->create_image());
+    return img;
   }
 
   ~OpenMCPlotter() {

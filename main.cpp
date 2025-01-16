@@ -39,15 +39,30 @@ public:
             upVector = {0.0, 0.0, 1.0};
           }
 
-    void applyTransformations() const {
+    void applyTransformations() {
         glLoadIdentity();
-        gluLookAt(position[0], position[1], position[2],
-                  lookAt[0], lookAt[1], lookAt[2],
-                  upVector[0], upVector[1], upVector[2]);
-        glTranslatef(panX, panY, zoom);
-        glRotatef(rotationX, 1.0f, 0.0f, 0.0f);
-        glRotatef(rotationY, 0.0f, 1.0f, 0.0f);
+
+        // Adjust position and lookAt with panning
+        openmc::Position adjustedPosition = position;
+        openmc::Position adjustedLookAt = lookAt;
+
+        applyPanAndRotation(adjustedPosition);
+        applyPanAndRotation(adjustedLookAt);
+
+        gluLookAt(adjustedPosition[0], adjustedPosition[1], adjustedPosition[2],
+                adjustedLookAt[0], adjustedLookAt[1], adjustedLookAt[2],
+                upVector[0], upVector[1], upVector[2]);
     }
+
+    // void applyTransformations() const {
+    //     glLoadIdentity();
+    //     gluLookAt(position[0], position[1], position[2],
+    //               lookAt[0], lookAt[1], lookAt[2],
+    //               upVector[0], upVector[1], upVector[2]);
+    //     glTranslatef(panX, panY, zoom);
+    //     glRotatef(rotationX, 1.0f, 0.0f, 0.0f);
+    //     glRotatef(rotationY, 0.0f, 1.0f, 0.0f);
+    // }
 
     void updateView(int width, int height) {
         glMatrixMode(GL_PROJECTION);
@@ -76,29 +91,62 @@ openmc::Position getTransformedPosition() const {
 
 private:
     void applyPanAndRotation(openmc::Position& vec) const {
-        // Apply zoom
-        vec[2] += zoom;
+        // Calculate the forward vector (camera direction)
+        openmc::Position forward = lookAt - position;
+        forward = forward / forward.norm(); // Normalize
 
-        // Apply pan
-        vec[0] += panX;
-        vec[1] += panY;
+        // Calculate the right vector (cross product of forward and up)
+        openmc::Position right = forward.cross(upVector);
+        right = right / right.norm(); // Normalize
 
-        // Apply rotation around Y-axis (yaw)
+        // Calculate the true up vector (cross product of right and forward)
+        openmc::Position trueUp = right.cross(forward);
+
+        // Apply pan in the view plane
+        vec = vec + panY * right + panX * trueUp;
+
+        // Apply rotation (yaw and pitch)
         double cosY = std::cos(rotationY * M_PI / 180.0);
         double sinY = std::sin(rotationY * M_PI / 180.0);
+        double cosX = std::cos(rotationX * M_PI / 180.0);
+        double sinX = std::sin(rotationX * M_PI / 180.0);
+
         double x = vec[0] * cosY - vec[2] * sinY;
         double z = vec[0] * sinY + vec[2] * cosY;
         vec[0] = x;
         vec[2] = z;
 
-        // Apply rotation around X-axis (pitch)
-        double cosX = std::cos(rotationX * M_PI / 180.0);
-        double sinX = std::sin(rotationX * M_PI / 180.0);
         double y = vec[1] * cosX - vec[2] * sinX;
         z = vec[1] * sinX + vec[2] * cosX;
         vec[1] = y;
         vec[2] = z;
-    }};
+    }
+
+    // void applyPanAndRotation(openmc::Position& vec) const {
+    //     // Apply zoom
+    //     vec[2] += zoom;
+
+    //     // Apply pan
+    //     vec[0] += panX;
+    //     vec[1] += panY;
+
+    //     // Apply rotation around Y-axis (yaw)
+    //     double cosY = std::cos(rotationY * M_PI / 180.0);
+    //     double sinY = std::sin(rotationY * M_PI / 180.0);
+    //     double x = vec[0] * cosY - vec[2] * sinY;
+    //     double z = vec[0] * sinY + vec[2] * cosY;
+    //     vec[0] = x;
+    //     vec[2] = z;
+
+    //     // Apply rotation around X-axis (pitch)
+    //     double cosX = std::cos(rotationX * M_PI / 180.0);
+    //     double sinX = std::sin(rotationX * M_PI / 180.0);
+    //     double y = vec[1] * cosX - vec[2] * sinX;
+    //     z = vec[1] * sinX + vec[2] * cosX;
+    //     vec[1] = y;
+    //     vec[2] = z;
+    // }
+};
 
 // Global camera instance
 Camera camera;
@@ -276,7 +324,7 @@ void updateVisibleMaterials(OpenMCPlotter& plotter) {
 void transferCameraInfo(OpenMCPlotter& plotter, const Camera& camera) {
     plotter.set_camera_position(camera.getTransformedPosition());
     plotter.set_look_at(camera.getTransformedLookAt());
-    plotter.set_up_vector(camera.getTransformedUpVector());
+    // plotter.set_up_vector(camera.getTransformedUpVector());
     plotter.set_light_position(camera.lightPosition);
     plotter.set_field_of_view(camera.fov);
 }
@@ -326,8 +374,6 @@ int main(int argc, char* argv[]) {
 
     transferCameraInfo(openmc_plotter, camera);
 
-
-
     while (!glfwWindowShouldClose(window)) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -356,7 +402,6 @@ int main(int argc, char* argv[]) {
         //  // Render Dear ImGui
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-
 
         glfwSwapBuffers(window);
     }
