@@ -217,22 +217,60 @@ void drawBackground(GLuint texture) {
     glEnable(GL_DEPTH_TEST);
 }
 
-void displayColorLegend(const std::unordered_map<int32_t, openmc::RGBColor>& colorMap) {
+// A map to track visibility state for each material
+std::unordered_map<int32_t, bool> materialVisibility;
+
+using VisibilityCallback = std::function<void(int32_t, bool)>;
+
+
+VisibilityCallback onVisibilityChange = [](int32_t materialID, bool visibility) {
+    if (materialVisibility.find(materialID) != materialVisibility.end()) {
+        materialVisibility[materialID] = visibility;
+    }
+};
+
+void displayColorLegend(const std::unordered_map<int32_t, openmc::RGBColor>& colorMap, VisibilityCallback onVisibilityChange = nullptr) {
     ImGui::Begin("Color Legend");
     ImGui::Text("Legend:"); // Title of the legend
 
     for (const auto& [materialID, color] : colorMap) {
+        // Ensure material ID has a visibility entry
+        if (materialVisibility.find(materialID) == materialVisibility.end()) {
+            materialVisibility[materialID] = true; // Default visibility is true
+        }
+
         // Convert color values from [0-255] to [0-1] for ImGui
         float r = color.red / 255.0f;
         float g = color.green / 255.0f;
         float b = color.blue / 255.0f;
 
+        // Draw a color square
         ImGui::ColorButton(("##Color" + std::to_string(materialID)).c_str(), ImVec4(r, g, b, 1.0f), 0, ImVec2(20, 20));
         ImGui::SameLine();
+
         ImGui::Text("Material ID: %d", materialID);
+
+       // Add a visibility checkbox with a callback
+        ImGui::SameLine();
+        bool visibility = materialVisibility[materialID];
+        if (ImGui::Checkbox(("Visible##" + std::to_string(materialID)).c_str(), &visibility)) {
+            // Update visibility in the map
+            materialVisibility[materialID] = visibility;
+
+            // Trigger the callback
+            if (onVisibilityChange) {
+                onVisibilityChange(materialID, visibility);
+            }
+        }
     }
 
     ImGui::End();
+}
+
+void updateVisibleMaterials(OpenMCPlotter& plotter) {
+    for (const auto& [materialID, visibility] : materialVisibility) {
+        plotter.set_material_visibility(materialID, visibility);
+    }
 }
 
 void transferCameraInfo(OpenMCPlotter& plotter, const Camera& camera) {
@@ -295,6 +333,7 @@ int main(int argc, char* argv[]) {
 
         camera.applyTransformations();
         transferCameraInfo(openmc_plotter, camera);
+        updateVisibleMaterials(openmc_plotter);
 
         // Start the Dear ImGui frame
         ImGui_ImplOpenGL3_NewFrame();

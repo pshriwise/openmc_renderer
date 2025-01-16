@@ -56,6 +56,16 @@ public:
 
   }
 
+  void set_material_visibility(int32_t id, bool visibility) {
+    // have to convert from material ID to index
+    int32_t mat_index = openmc::model::material_map[id];
+    if (visibility) {
+      plot()->opaque_ids().insert(mat_index);
+    } else {
+      plot()->opaque_ids().erase(mat_index);
+    }
+  }
+
   std::unordered_map<int32_t, openmc::RGBColor> color_map() {
     auto map_out = std::unordered_map<int32_t, openmc::RGBColor>();
     if (plot()->color_by() == openmc::PlottableInterface::PlotColorBy::mats) {
