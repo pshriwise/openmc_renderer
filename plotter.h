@@ -9,8 +9,20 @@
 
 class OpenMCPlotter {
 
+private:
+  OpenMCPlotter() {};
+
 public:
-  OpenMCPlotter(int argc, char* argv[]) {
+  static OpenMCPlotter& get_instance() {
+    static OpenMCPlotter instance;
+    return instance;
+  }
+
+  OpenMCPlotter(OpenMCPlotter const&) = delete;
+  void operator=(OpenMCPlotter const&) = delete;
+
+
+  void initialize(int argc, char* argv[]) {
     int err = openmc_init(argc, argv, nullptr);
     if (err) {
       throw std::runtime_error("Error initializing OpenMC");
@@ -110,10 +122,3 @@ public:
 private:
   std::unique_ptr<openmc::PhongPlot> plot_;
 };
-
-// void transferCameraInfo(OpenMCPlotter& plotter, const Camera& camera) {
-//     plotter.set_camera_position(camera.position);
-//     plotter.set_look_at(camera.lookAt);
-//     plotter.set_up_vector(camera.upVector);
-//     plotter.set_field_of_view(camera.fov);
-// }

@@ -295,7 +295,8 @@ void transferCameraInfo(OpenMCPlotter& plotter, const Camera& camera) {
 }
 
 int main(int argc, char* argv[]) {
-    auto openmc_plotter = OpenMCPlotter(argc, argv);
+    auto& openmc_plotter {OpenMCPlotter::get_instance()};
+    openmc_plotter.initialize(argc, argv);
     auto image = openmc_plotter.create_image();
 
     if (!glfwInit()) {
