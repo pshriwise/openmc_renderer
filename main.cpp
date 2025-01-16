@@ -217,6 +217,24 @@ void drawBackground(GLuint texture) {
     glEnable(GL_DEPTH_TEST);
 }
 
+void displayColorLegend(const std::unordered_map<int32_t, openmc::RGBColor>& colorMap) {
+    ImGui::Begin("Color Legend");
+    ImGui::Text("Legend:"); // Title of the legend
+
+    for (const auto& [materialID, color] : colorMap) {
+        // Convert color values from [0-255] to [0-1] for ImGui
+        float r = color.red / 255.0f;
+        float g = color.green / 255.0f;
+        float b = color.blue / 255.0f;
+
+        ImGui::ColorButton(("##Color" + std::to_string(materialID)).c_str(), ImVec4(r, g, b, 1.0f), 0, ImVec2(20, 20));
+        ImGui::SameLine();
+        ImGui::Text("Material ID: %d", materialID);
+    }
+
+    ImGui::End();
+}
+
 void transferCameraInfo(OpenMCPlotter& plotter, const Camera& camera) {
     plotter.set_camera_position(camera.getTransformedPosition());
     plotter.set_look_at(camera.getTransformedLookAt());
@@ -282,10 +300,10 @@ int main(int argc, char* argv[]) {
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
-        // Create your ImGui UI
-        ImGui::Begin("Hello, world!");
-        ImGui::Text("This is some useful text.");
-        ImGui::End();
+
+        // Retrieve color map and display the legend
+        auto colorMap = openmc_plotter.color_map();
+        displayColorLegend(colorMap);
 
         // Update the texture with new image data if the camera has changed
         auto newImageData = openmc_plotter.create_image(); // Assume this generates a new image based on the camera
