@@ -23,6 +23,8 @@ public:
     float zoom;
     float panX;
     float panY;
+    float zoomSensitivity;  // Added zoom sensitivity control
+    float panSensitivity;  // Added pan sensitivity control
 
     // Quaternion for rotation
     struct Quaternion {
@@ -73,7 +75,8 @@ public:
     openmc::Position right;  // Added to track right vector
 
     Camera()
-        : zoom(-5.0f), panX(0.0f), panY(0.0f), fov(45.0) {
+        : zoom(-5.0f), panX(0.0f), panY(0.0f),
+          zoomSensitivity(2.5f), panSensitivity(0.02f), fov(45.0) {
         position = {10, 10, 10};
         lookAt = {0.0, 0.0, 0.0};
         upVector = {0.0, 0.0, 1.0};
@@ -420,8 +423,8 @@ public:
         transferCameraInfo();
     }
     if (draggingMiddle) {
-        camera_.panX -= (xpos - lastMouseX) * 0.01f;
-        camera_.panY -= (ypos - lastMouseY) * 0.01f;
+        camera_.panX -= (xpos - lastMouseX) * camera_.panSensitivity;
+        camera_.panY -= (ypos - lastMouseY) * camera_.panSensitivity;
         lastMouseX = xpos;
         lastMouseY = ypos;
         transferCameraInfo();
@@ -444,7 +447,7 @@ public:
           return;
       }
 
-      camera_.zoom += yoffset;
+      camera_.zoom += yoffset * camera_.zoomSensitivity;  // Apply zoom sensitivity
       transferCameraInfo();
   }
 
