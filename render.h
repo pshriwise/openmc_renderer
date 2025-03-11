@@ -608,13 +608,28 @@ public:
       }
 
       float zoomFactor = yoffset * camera_.zoomSensitivity;
-      camera_.zoom += zoomFactor;  // Apply zoom to camera
 
-      // Scale light position based on zoom
-      float scale = 1.0f + (zoomFactor / 10.0f);  // Smaller scale factor for smoother light adjustment
-      camera_.lightPosition[0] *= scale;
-      camera_.lightPosition[1] *= scale;
-      camera_.lightPosition[2] *= scale;
+      if (light_control_mode) {
+          // Only adjust light position when in light control mode
+          float currentDistance = std::sqrt(
+              camera_.lightPosition[0] * camera_.lightPosition[0] +
+              camera_.lightPosition[1] * camera_.lightPosition[1] +
+              camera_.lightPosition[2] * camera_.lightPosition[2]
+          );
+
+          float scale = 1.0f + (zoomFactor / 10.0f);
+          float newDistance = currentDistance * scale;
+
+          // Ensure minimum light distance of 5.0f
+          if (newDistance >= 5.0f) {
+              camera_.lightPosition[0] *= scale;
+              camera_.lightPosition[1] *= scale;
+              camera_.lightPosition[2] *= scale;
+          }
+      } else {
+          // Only update camera zoom when not in light control mode
+          camera_.zoom -= zoomFactor;  // Invert zoom direction for more intuitive control
+      }
 
       transferCameraInfo();
   }
