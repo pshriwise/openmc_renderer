@@ -208,6 +208,35 @@ public:
         return transformedUp;
     }
 
+    void setIsometricView() {
+        // Reset rotation
+        rotation = Quaternion();
+
+        // Set camera to isometric position (equal angles to all axes)
+        float distance = 15.0f;  // Distance from origin
+        float angle = 54.736f;   // arctan(sqrt(2)) in degrees - standard isometric angle
+        float phi = 45.0f;       // Azimuthal angle
+
+        // Convert spherical coordinates to Cartesian
+        float theta = angle * M_PI / 180.0f;  // Convert to radians
+        float phiRad = phi * M_PI / 180.0f;
+
+        position = {
+            distance * sin(theta) * cos(phiRad),
+            distance * sin(theta) * sin(phiRad),
+            distance * cos(theta)
+        };
+
+        // Reset other parameters
+        lookAt = {0.0, 0.0, 0.0};
+        upVector = {0.0, 0.0, 1.0};
+        zoom = -5.0f;
+        panX = 0.0f;
+        panY = 0.0f;
+
+        updateVectors();
+    }
+
 private:
     void applyRotation(openmc::Position& vec) const {
         // Apply quaternion rotation
@@ -566,6 +595,15 @@ public:
   static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
     if (key == GLFW_KEY_W && action == GLFW_PRESS && (mods & GLFW_MOD_CONTROL)) {
         glfwSetWindowShouldClose(window, GLFW_TRUE);
+    }
+
+    // Handle isometric view
+    if (key == GLFW_KEY_I && action == GLFW_PRESS) {
+        auto renderer = static_cast<OpenMCRenderer*>(glfwGetWindowUserPointer(window));
+        if (renderer) {
+            renderer->camera_.setIsometricView();
+            renderer->transferCameraInfo();
+        }
     }
   }
 
