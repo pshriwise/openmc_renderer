@@ -313,6 +313,9 @@ private:
 class OpenMCRenderer {
 
 public:
+  // Add state for light control
+  bool light_control_mode = false;
+
   OpenMCRenderer(int argc, char* argv[]) {
     openmc_plotter_.initialize(argc, argv);
 
@@ -524,21 +527,67 @@ public:
         return;
     }
 
-    // Handle existing camera controls
-    if (draggingLeft) {
-        float deltaX = (xpos - lastMouseX) * 0.5f;
-        float deltaY = (ypos - lastMouseY) * 0.5f;
-        camera_.rotate(deltaX, deltaY);
+    if (light_control_mode) {
+        // Handle light position control
+        if (draggingLeft) {
+            // Rotate light around the model
+            float deltaX = (xpos - lastMouseX) * 0.1f;
+            float deltaY = (ypos - lastMouseY) * 0.1f;
+
+            // Get current light distance from origin
+            float distance = std::sqrt(
+                camera_.lightPosition[0] * camera_.lightPosition[0] +
+                camera_.lightPosition[1] * camera_.lightPosition[1] +
+                camera_.lightPosition[2] * camera_.lightPosition[2]
+            );
+
+            // Convert to spherical coordinates
+            float theta = static_cast<float>(std::acos(camera_.lightPosition[2] / distance));
+            float phi = static_cast<float>(std::atan2(camera_.lightPosition[1], camera_.lightPosition[0]));
+
+            // Update angles
+            theta = std::max(0.1f, std::min(static_cast<float>(M_PI) - 0.1f, theta + deltaY));
+            phi += deltaX;
+
+            // Convert back to Cartesian coordinates
+            camera_.lightPosition[0] = distance * std::sin(theta) * std::cos(phi);
+            camera_.lightPosition[1] = distance * std::sin(theta) * std::sin(phi);
+            camera_.lightPosition[2] = distance * std::cos(theta);
+        }
+        if (draggingMiddle) {
+            // Move light closer/further from origin
+            float deltaY = (ypos - lastMouseY) * 0.1f;
+            float currentDistance = std::sqrt(
+                camera_.lightPosition[0] * camera_.lightPosition[0] +
+                camera_.lightPosition[1] * camera_.lightPosition[1] +
+                camera_.lightPosition[2] * camera_.lightPosition[2]
+            );
+            float newDistance = std::max(5.0f, currentDistance + deltaY);
+            float scale = newDistance / currentDistance;
+            camera_.lightPosition[0] *= scale;
+            camera_.lightPosition[1] *= scale;
+            camera_.lightPosition[2] *= scale;
+        }
         lastMouseX = xpos;
         lastMouseY = ypos;
         transferCameraInfo();
-    }
-    if (draggingMiddle) {
-        camera_.panX -= (xpos - lastMouseX) * camera_.panSensitivity;
-        camera_.panY -= (ypos - lastMouseY) * camera_.panSensitivity;
-        lastMouseX = xpos;
-        lastMouseY = ypos;
-        transferCameraInfo();
+    } else {
+        // Handle existing camera controls
+        if (draggingLeft) {
+            float deltaX = (xpos - lastMouseX) * 0.5f;
+            float deltaY = (ypos - lastMouseY) * 0.5f;
+            camera_.rotate(deltaX, deltaY);
+            lastMouseX = xpos;
+            lastMouseY = ypos;
+            transferCameraInfo();
+        }
+        if (draggingMiddle) {
+            camera_.panX -= (xpos - lastMouseX) * camera_.panSensitivity;
+            camera_.panY -= (ypos - lastMouseY) * camera_.panSensitivity;
+            lastMouseX = xpos;
+            lastMouseY = ypos;
+            transferCameraInfo();
+        }
     }
   }
 
@@ -558,7 +607,15 @@ public:
           return;
       }
 
-      camera_.zoom += yoffset * camera_.zoomSensitivity;  // Apply zoom sensitivity
+      float zoomFactor = yoffset * camera_.zoomSensitivity;
+      camera_.zoom += zoomFactor;  // Apply zoom to camera
+
+      // Scale light position based on zoom
+      float scale = 1.0f + (zoomFactor / 10.0f);  // Smaller scale factor for smoother light adjustment
+      camera_.lightPosition[0] *= scale;
+      camera_.lightPosition[1] *= scale;
+      camera_.lightPosition[2] *= scale;
+
       transferCameraInfo();
   }
 
@@ -747,6 +804,16 @@ public:
         }
     }
 
+    // Handle light control mode with 'L' key
+    if (key == GLFW_KEY_L) {
+        if (action == GLFW_PRESS) {
+            renderer->light_control_mode = true;
+        } else if (action == GLFW_RELEASE) {
+            renderer->light_control_mode = false;
+        }
+        return;
+    }
+
     // Only process other shortcuts if help overlay is not visible
     if (!renderer->show_help_overlay) {
         if ((key == GLFW_KEY_W || key == GLFW_KEY_Q) && action == GLFW_PRESS && (mods & GLFW_MOD_CONTROL)) {
@@ -931,6 +998,11 @@ public:
           ImGui::BulletText("Left Mouse Button + Drag: Rotate camera");
           ImGui::BulletText("Middle Mouse Button + Drag: Pan camera");
           ImGui::BulletText("Mouse Wheel: Zoom in/out");
+
+          ImGui::Spacing();
+          ImGui::Text("Light Controls:");
+          ImGui::BulletText("Hold L + Left Mouse Button: Rotate light around model");
+          ImGui::BulletText("Hold L + Middle Mouse Button: Move light closer/further");
 
           ImGui::Spacing();
           ImGui::Text("View Shortcuts:");
