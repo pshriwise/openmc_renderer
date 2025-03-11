@@ -654,7 +654,7 @@ public:
 
   // Modify key callback to remove 'Y' key handling
   static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
-    if (key == GLFW_KEY_W && action == GLFW_PRESS && (mods & GLFW_MOD_CONTROL)) {
+    if ((key == GLFW_KEY_W || key == GLFW_KEY_Q) && action == GLFW_PRESS && (mods & GLFW_MOD_CONTROL)) {
         glfwSetWindowShouldClose(window, GLFW_TRUE);
     }
 
