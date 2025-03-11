@@ -353,6 +353,9 @@ public:
     // Start in isometric view
     camera_.setIsometricView();
     transferCameraInfo();
+
+    // Add help overlay state and show it on startup
+    show_help_overlay = true;
   }
 
   void render() {
@@ -368,9 +371,32 @@ public:
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        // Retrieve color map and display the legend
-        displayColorLegend();
-        displaySettings();  // Add settings window
+        // Add help button in lower-right corner
+        const float windowWidth = ImGui::GetIO().DisplaySize.x;
+        const float windowHeight = ImGui::GetIO().DisplaySize.y;
+        ImGui::SetNextWindowPos(ImVec2(windowWidth - 50, windowHeight - 40), ImGuiCond_Always);
+        ImGui::SetNextWindowBgAlpha(0.35f);
+        ImGui::Begin("Help Button", nullptr,
+            ImGuiWindowFlags_NoTitleBar |
+            ImGuiWindowFlags_NoResize |
+            ImGuiWindowFlags_AlwaysAutoResize |
+            ImGuiWindowFlags_NoMove |
+            ImGuiWindowFlags_NoSavedSettings);
+        if (ImGui::Button("?")) {
+            show_help_overlay = !show_help_overlay;
+        }
+        ImGui::End();
+
+        // Render help overlay if active
+        if (show_help_overlay) {
+            renderHelpOverlay();
+        }
+
+        // Only show other windows if help overlay is not active
+        if (!show_help_overlay) {
+            displayColorLegend();
+            displaySettings();
+        }
 
         // Update the texture with new image data if the camera has changed
         auto newImageData = openmc_plotter_.create_image();
@@ -458,9 +484,9 @@ public:
   }
 
   void mouseButtonUpdate(int button, int action, int mods) {
-    // Skip if ImGui is handling this event
+    // Skip if help overlay is visible or ImGui is handling this event
     ImGuiIO& io = ImGui::GetIO();
-    if (io.WantCaptureMouse) {
+    if (show_help_overlay || io.WantCaptureMouse) {
         return;
     }
 
@@ -492,9 +518,9 @@ public:
   }
 
   void cursorPositionUpdate(double xpos, double ypos) {
-    // Skip if ImGui is handling this event
+    // Skip if help overlay is visible or ImGui is handling this event
     ImGuiIO& io = ImGui::GetIO();
-    if (io.WantCaptureMouse) {
+    if (show_help_overlay || io.WantCaptureMouse) {
         return;
     }
 
@@ -526,9 +552,9 @@ public:
   }
 
   void scrollUpdate(double xoffset, double yoffset) {
-      // Skip if ImGui is handling this event
+      // Skip if help overlay is visible or ImGui is handling this event
       ImGuiIO& io = ImGui::GetIO();
-      if (io.WantCaptureMouse) {
+      if (show_help_overlay || io.WantCaptureMouse) {
           return;
       }
 
@@ -704,36 +730,52 @@ public:
 
   // Modify key callback to remove 'Y' key handling
   static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
-    if ((key == GLFW_KEY_W || key == GLFW_KEY_Q) && action == GLFW_PRESS && (mods & GLFW_MOD_CONTROL)) {
-        glfwSetWindowShouldClose(window, GLFW_TRUE);
+    auto renderer = static_cast<OpenMCRenderer*>(glfwGetWindowUserPointer(window));
+    if (!renderer) return;
+
+    // Handle help overlay toggle with '?' key
+    if (key == GLFW_KEY_SLASH && (mods & GLFW_MOD_SHIFT) && action == GLFW_PRESS) {
+        renderer->show_help_overlay = !renderer->show_help_overlay;
+        return;
     }
 
-    // Handle isometric view
-    if (key == GLFW_KEY_I && action == GLFW_PRESS) {
-        auto renderer = static_cast<OpenMCRenderer*>(glfwGetWindowUserPointer(window));
-        if (renderer) {
-            renderer->camera_.setIsometricView();
-            renderer->transferCameraInfo();
+    // Handle Escape key
+    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
+        if (renderer->show_help_overlay) {
+            renderer->show_help_overlay = false;
+            return;
         }
     }
 
-    // Handle orthographic views
-    auto renderer = static_cast<OpenMCRenderer*>(glfwGetWindowUserPointer(window));
-    if (renderer && action == GLFW_PRESS) {
-        bool negative = (mods & GLFW_MOD_SHIFT) != 0;
-        switch (key) {
-            case GLFW_KEY_X:
-                renderer->camera_.setAxisView(Camera::Axis::X, negative);
-                renderer->transferCameraInfo();
-                break;
-            case GLFW_KEY_Y:
-                renderer->camera_.setAxisView(Camera::Axis::Y, negative);
-                renderer->transferCameraInfo();
-                break;
-            case GLFW_KEY_Z:
-                renderer->camera_.setAxisView(Camera::Axis::Z, negative);
-                renderer->transferCameraInfo();
-                break;
+    // Only process other shortcuts if help overlay is not visible
+    if (!renderer->show_help_overlay) {
+        if ((key == GLFW_KEY_W || key == GLFW_KEY_Q) && action == GLFW_PRESS && (mods & GLFW_MOD_CONTROL)) {
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+        }
+
+        // Handle isometric view
+        if (key == GLFW_KEY_I && action == GLFW_PRESS) {
+            renderer->camera_.setIsometricView();
+            renderer->transferCameraInfo();
+        }
+
+        // Handle orthographic views
+        if (action == GLFW_PRESS) {
+            bool negative = (mods & GLFW_MOD_SHIFT) != 0;
+            switch (key) {
+                case GLFW_KEY_X:
+                    renderer->camera_.setAxisView(Camera::Axis::X, negative);
+                    renderer->transferCameraInfo();
+                    break;
+                case GLFW_KEY_Y:
+                    renderer->camera_.setAxisView(Camera::Axis::Y, negative);
+                    renderer->transferCameraInfo();
+                    break;
+                case GLFW_KEY_Z:
+                    renderer->camera_.setAxisView(Camera::Axis::Z, negative);
+                    renderer->transferCameraInfo();
+                    break;
+            }
         }
     }
   }
@@ -858,6 +900,65 @@ public:
               // Silently handle cases where we might be pointing outside the geometry
           }
       }
+  }
+
+  // Add help overlay state
+  bool show_help_overlay = false;
+
+  void renderHelpOverlay() {
+      ImGuiIO& io = ImGui::GetIO();
+      const ImGuiViewport* viewport = ImGui::GetMainViewport();
+
+      // Set up full-screen overlay
+      ImGui::SetNextWindowPos(viewport->Pos);
+      ImGui::SetNextWindowSize(viewport->Size);
+
+      ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDecoration |
+                                    ImGuiWindowFlags_NoMove |
+                                    ImGuiWindowFlags_NoResize |
+                                    ImGuiWindowFlags_NoSavedSettings;
+
+      // Create semi-transparent dark overlay
+      ImGui::SetNextWindowBgAlpha(0.85f);
+
+      if (ImGui::Begin("Help Overlay", &show_help_overlay, window_flags)) {
+          ImGui::PushFont(io.Fonts->Fonts[0]);
+
+          ImGui::Text("OpenMC Renderer Controls");
+          ImGui::Separator();
+
+          ImGui::Text("Camera Controls:");
+          ImGui::BulletText("Left Mouse Button + Drag: Rotate camera");
+          ImGui::BulletText("Middle Mouse Button + Drag: Pan camera");
+          ImGui::BulletText("Mouse Wheel: Zoom in/out");
+
+          ImGui::Spacing();
+          ImGui::Text("View Shortcuts:");
+          ImGui::BulletText("I: Reset to isometric view");
+          ImGui::BulletText("X: View along X axis (positive direction)");
+          ImGui::BulletText("Y: View along Y axis (positive direction)");
+          ImGui::BulletText("Z: View along Z axis (positive direction)");
+          ImGui::BulletText("Shift + X: View along X axis (negative direction)");
+          ImGui::BulletText("Shift + Y: View along Y axis (negative direction)");
+          ImGui::BulletText("Shift + Z: View along Z axis (negative direction)");
+
+          ImGui::Spacing();
+          ImGui::Text("General Controls:");
+          ImGui::BulletText("?: Toggle this help overlay");
+          ImGui::BulletText("Esc: Close overlay or exit application");
+          ImGui::BulletText("Ctrl + W/Q: Exit application");
+
+          ImGui::Spacing();
+          ImGui::Text("Press ESC or click anywhere to close this overlay");
+
+          ImGui::PopFont();
+
+          // Close overlay if clicked outside or Esc pressed
+          if (ImGui::IsMouseClicked(0) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+              show_help_overlay = false;
+          }
+      }
+      ImGui::End();
   }
 };
 
