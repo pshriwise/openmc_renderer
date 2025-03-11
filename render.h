@@ -519,20 +519,74 @@ public:
       camera_.updateView(width, height);
   }
 
-  // void displayColorLegend(const std::unordered_map<int32_t, openmc::RGBColor>& colorMap, VisibilityCallback onVisibilityChange = nullptr) {
+  // A map to track visibility state for each material and cell
+  std::unordered_map<int32_t, bool> materialVisibility;
+  std::unordered_map<int32_t, bool> cellVisibility;
+  // Cache for custom colors
+  std::unordered_map<int32_t, openmc::RGBColor> materialColors;
+  std::unordered_map<int32_t, openmc::RGBColor> cellColors;
+
+  void cacheCurrentColors() {
+    const auto& colorMap = openmc_plotter_.color_map();
+    auto& targetCache = openmc_plotter_.plot()->color_by() == openmc::PlottableInterface::PlotColorBy::mats ?
+                       materialColors : cellColors;
+
+    // Cache current colors
+    for (const auto& [id, color] : colorMap) {
+      targetCache[id] = color;
+    }
+  }
+
+  void restoreColorCache() {
+    const auto& sourceCache = openmc_plotter_.plot()->color_by() == openmc::PlottableInterface::PlotColorBy::mats ?
+                            materialColors : cellColors;
+
+    // Restore cached colors
+    for (const auto& [id, color] : sourceCache) {
+      openmc_plotter_.set_color(id, color);
+    }
+  }
+
   void displayColorLegend() {
     const auto colorMap = openmc_plotter_.color_map();
 
-    static int selected_material = -1; // Track which material's color is being edited
+    static int selected_id = -1; // Track which material/cell color is being edited
     static openmc::RGBColor temp_color = {0, 0, 0}; // Temporary color for editing
 
     ImGui::Begin("Color Legend");
+
+    // Add radio buttons for color mode selection
+    static bool colorByMaterials = (openmc_plotter_.plot()->color_by() == openmc::PlottableInterface::PlotColorBy::mats);
+    bool previousMode = colorByMaterials;
+
+    if (ImGui::RadioButton("Color by Materials", colorByMaterials)) {
+        if (!colorByMaterials) { // Only if actually changing to materials mode
+            cacheCurrentColors(); // Cache current cell colors
+            colorByMaterials = true;
+            openmc_plotter_.plot()->color_by_ = openmc::PlottableInterface::PlotColorBy::mats;
+            restoreColorCache(); // Restore material colors
+        }
+    }
+    ImGui::SameLine();
+    if (ImGui::RadioButton("Color by Cells", !colorByMaterials)) {
+        if (colorByMaterials) { // Only if actually changing to cells mode
+            cacheCurrentColors(); // Cache current material colors
+            colorByMaterials = false;
+            openmc_plotter_.plot()->color_by_ = openmc::PlottableInterface::PlotColorBy::cells;
+            restoreColorCache(); // Restore cell colors
+        }
+    }
+
+    ImGui::Separator();
     ImGui::Text("Legend:"); // Title of the legend
 
-    for (const auto& [material_id, color] : colorMap) {
-        // Ensure material ID has a visibility entry
-        if (materialVisibility.find(material_id) == materialVisibility.end()) {
-            materialVisibility[material_id] = true; // Default visibility is true
+    auto& currentVisibilityMap = colorByMaterials ? materialVisibility : cellVisibility;
+    std::string idPrefix = colorByMaterials ? "Material" : "Cell";
+
+    for (const auto& [id, color] : colorMap) {
+        // Ensure ID has a visibility entry
+        if (currentVisibilityMap.find(id) == currentVisibilityMap.end()) {
+            currentVisibilityMap[id] = true; // Default visibility is true
         }
 
         // Convert color values from [0-255] to [0-1] for ImGui
@@ -541,22 +595,21 @@ public:
         float b = color.blue / 255.0f;
 
         // Draw a color square
-        if (ImGui::ColorButton(("##Color" + std::to_string(material_id)).c_str(), ImVec4(r, g, b, 1.0f))) {
-            // Open the color picker when the color is clicked
-            selected_material = material_id;
+        if (ImGui::ColorButton(("##Color" + std::to_string(id)).c_str(), ImVec4(r, g, b, 1.0f))) {
+            selected_id = id;
             temp_color = color;
             ImGui::OpenPopup("Edit Color");
         }
         ImGui::SameLine();
 
-        ImGui::Text("Material ID: %d", material_id);
+        ImGui::Text("%s ID: %d", idPrefix.c_str(), id);
 
-      // Add a visibility checkbox with a callback
+        // Add a visibility checkbox
         ImGui::SameLine();
-        bool visibility = materialVisibility[material_id];
-        if (ImGui::Checkbox(("Visible##" + std::to_string(material_id)).c_str(), &visibility)) {
-            // Update visibility in the map
-            materialVisibility[material_id] = visibility;
+        bool visibility = currentVisibilityMap[id];
+        if (ImGui::Checkbox(("Visible##" + std::to_string(id)).c_str(), &visibility)) {
+            currentVisibilityMap[id] = visibility;
+            openmc_plotter_.set_material_visibility(id, visibility);
         }
     }
 
@@ -567,17 +620,17 @@ public:
         float temp_g = temp_color.green / 255.0f;
         float temp_b = temp_color.blue / 255.0f;
 
-        if (ImGui::ColorEdit3("Material Color", &temp_r)) {
-            // Update temporary color as user interacts
+        if (ImGui::ColorEdit3((idPrefix + " Color").c_str(), &temp_r)) {
             temp_color.red = static_cast<uint8_t>(temp_r * 255);
             temp_color.green = static_cast<uint8_t>(temp_g * 255);
             temp_color.blue = static_cast<uint8_t>(temp_b * 255);
         }
 
         if (ImGui::Button("Save")) {
-            // Save the new color to the color map
-            std::cout << "Saving color for material " << selected_material << std::endl;
-            openmc_plotter_.set_color(selected_material, temp_color);
+            openmc_plotter_.set_color(selected_id, temp_color);
+            // Cache the color
+            auto& targetCache = colorByMaterials ? materialColors : cellColors;
+            targetCache[selected_id] = temp_color;
             ImGui::CloseCurrentPopup();
         }
 
@@ -590,13 +643,15 @@ public:
         ImGui::EndPopup();
     }
 
-      ImGui::End();
+    ImGui::End();
   }
 
   void updateVisibleMaterials() {
-      for (const auto& [material_id, visibility] : materialVisibility) {
-          openmc_plotter_.set_material_visibility(material_id, visibility);
-      }
+    auto& currentVisibilityMap = openmc_plotter_.plot()->color_by() == openmc::PlottableInterface::PlotColorBy::mats ?
+                                materialVisibility : cellVisibility;
+    for (const auto& [id, visibility] : currentVisibilityMap) {
+        openmc_plotter_.set_material_visibility(id, visibility);
+    }
   }
 
   // Modify key callback to remove 'Y' key handling
@@ -669,9 +724,6 @@ public:
   bool draggingMiddle {false};
   double lastMouseX;
   double lastMouseY;
-
-  // A map to track visibility state for each material
-  std::unordered_map<int32_t, bool> materialVisibility;
 
   GLFWwindow* window_ {nullptr};
   GLuint texture_;
