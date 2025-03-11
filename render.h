@@ -323,7 +323,7 @@ public:
         throw std::runtime_error("Failed to initialize GLFW");
     }
 
-    window_ = glfwCreateWindow(800, 600, "OpenMC Geometry", nullptr, nullptr);
+    window_ = glfwCreateWindow(800, 600, "OpenMC Rendering", nullptr, nullptr);
     if (!window_) {
         throw std::runtime_error("Failed to create GLFW window");
         glfwTerminate();
