@@ -559,7 +559,9 @@ public:
     static bool colorByMaterials = (openmc_plotter_.plot()->color_by() == openmc::PlottableInterface::PlotColorBy::mats);
     bool previousMode = colorByMaterials;
 
-    if (ImGui::RadioButton("Color by Materials", colorByMaterials)) {
+    ImGui::Text("Color by:");
+    ImGui::SameLine();
+    if (ImGui::RadioButton("Material", colorByMaterials)) {
         if (!colorByMaterials) { // Only if actually changing to materials mode
             cacheCurrentColors(); // Cache current cell colors
             colorByMaterials = true;
@@ -568,7 +570,7 @@ public:
         }
     }
     ImGui::SameLine();
-    if (ImGui::RadioButton("Color by Cells", !colorByMaterials)) {
+    if (ImGui::RadioButton("Cell", !colorByMaterials)) {
         if (colorByMaterials) { // Only if actually changing to cells mode
             cacheCurrentColors(); // Cache current material colors
             colorByMaterials = false;
