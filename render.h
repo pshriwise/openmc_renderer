@@ -754,27 +754,30 @@ public:
     ImGui::SetNextWindowCollapsed(true, ImGuiCond_FirstUseEver);
 
     if (ImGui::Begin("Camera Settings")) {
-        // Pan sensitivity slider (0.001 to 0.1)
+        // Pan sensitivity
+        ImGui::Text("Pan Sensitivity");
         float panSens = camera_.panSensitivity;
-        if (ImGui::SliderFloat("Pan Sensitivity", &panSens, 0.001f, 0.1f, "%.3f")) {
+        if (ImGui::SliderFloat("##Pan", &panSens, 0.001f, 0.1f, "%.3f")) {
             camera_.panSensitivity = panSens;
         }
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip("Adjusts the speed of camera panning");
         }
 
-        // Zoom sensitivity slider (0.5 to 5.0)
+        // Zoom sensitivity
+        ImGui::Text("Zoom Sensitivity");
         float zoomSens = camera_.zoomSensitivity;
-        if (ImGui::SliderFloat("Zoom Sensitivity", &zoomSens, 0.5f, 5.0f, "%.1f")) {
+        if (ImGui::SliderFloat("##Zoom", &zoomSens, 0.5f, 5.0f, "%.1f")) {
             camera_.zoomSensitivity = zoomSens;
         }
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip("Adjusts the speed of camera zooming");
         }
 
-        // Rotation sensitivity slider (0.1 to 2.0)
+        // Rotation sensitivity
+        ImGui::Text("Rotation Sensitivity");
         float rotSens = camera_.rotationSensitivity;
-        if (ImGui::SliderFloat("Rotation Sensitivity", &rotSens, 0.1f, 2.0f, "%.2f")) {
+        if (ImGui::SliderFloat("##Rotation", &rotSens, 0.1f, 2.0f, "%.2f")) {
             camera_.rotationSensitivity = rotSens;
         }
         if (ImGui::IsItemHovered()) {
