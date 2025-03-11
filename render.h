@@ -271,10 +271,13 @@ public:
         Z
     };
 
-    void setAxisView(Axis axis) {
+    void setAxisView(Axis axis, bool negative = false) {
         // Calculate current distance from camera to look-at point
         openmc::Position currentDir = getTransformedPosition() - getTransformedLookAt();
         float currentDistance = currentDir.norm();
+        if (negative) {
+            currentDistance = -currentDistance;
+        }
 
         // Reset rotation
         rotation = Quaternion();
@@ -288,15 +291,15 @@ public:
         // Set position and up vector based on axis
         switch (axis) {
             case Axis::X:
-                position[0] = currentDistance;  // Camera on positive X
+                position[0] = currentDistance;  // Camera on X axis
                 upVector = {0.0, 0.0, 1.0};  // Z is up
                 break;
             case Axis::Y:
-                position[1] = currentDistance;  // Camera on positive Y
+                position[1] = currentDistance;  // Camera on Y axis
                 upVector = {0.0, 0.0, 1.0};  // Z is up
                 break;
             case Axis::Z:
-                position[2] = currentDistance;  // Camera on positive Z
+                position[2] = currentDistance;  // Camera on Z axis
                 upVector = {0.0, 1.0, 0.0};  // Y is up for top view
                 break;
         }
@@ -717,17 +720,18 @@ public:
     // Handle orthographic views
     auto renderer = static_cast<OpenMCRenderer*>(glfwGetWindowUserPointer(window));
     if (renderer && action == GLFW_PRESS) {
+        bool negative = (mods & GLFW_MOD_SHIFT) != 0;
         switch (key) {
             case GLFW_KEY_X:
-                renderer->camera_.setAxisView(Camera::Axis::X);
+                renderer->camera_.setAxisView(Camera::Axis::X, negative);
                 renderer->transferCameraInfo();
                 break;
             case GLFW_KEY_Y:
-                renderer->camera_.setAxisView(Camera::Axis::Y);
+                renderer->camera_.setAxisView(Camera::Axis::Y, negative);
                 renderer->transferCameraInfo();
                 break;
             case GLFW_KEY_Z:
-                renderer->camera_.setAxisView(Camera::Axis::Z);
+                renderer->camera_.setAxisView(Camera::Axis::Z, negative);
                 renderer->transferCameraInfo();
                 break;
         }
