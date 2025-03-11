@@ -316,6 +316,7 @@ public:
 
         // Retrieve color map and display the legend
         displayColorLegend();
+        displaySettings();  // Add settings window
 
         // Update the texture with new image data if the camera has changed
         auto newImageData = openmc_plotter_.create_image();
@@ -605,6 +606,43 @@ public:
             renderer->transferCameraInfo();
         }
     }
+  }
+
+  void displaySettings() {
+    // Position the window in the right portion of the screen
+    const float windowWidth = ImGui::GetIO().DisplaySize.x;
+    const float windowHeight = ImGui::GetIO().DisplaySize.y;
+    const float settingsWidth = 300.0f;
+    const float settingsHeight = 120.0f;
+
+    // Position in the right third of the screen, below the top
+    ImGui::SetNextWindowPos(
+        ImVec2(windowWidth - settingsWidth - 10, windowHeight * 0.3f),
+        ImGuiCond_FirstUseEver
+    );
+    ImGui::SetNextWindowSize(ImVec2(settingsWidth, settingsHeight), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowCollapsed(true, ImGuiCond_FirstUseEver);
+
+    if (ImGui::Begin("Camera Settings")) {
+        // Pan sensitivity slider (0.001 to 0.1)
+        float panSens = camera_.panSensitivity;
+        if (ImGui::SliderFloat("Pan Sensitivity", &panSens, 0.001f, 0.1f, "%.3f")) {
+            camera_.panSensitivity = panSens;
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Adjusts the speed of camera panning");
+        }
+
+        // Zoom sensitivity slider (0.5 to 5.0)
+        float zoomSens = camera_.zoomSensitivity;
+        if (ImGui::SliderFloat("Zoom Sensitivity", &zoomSens, 0.5f, 5.0f, "%.1f")) {
+            camera_.zoomSensitivity = zoomSens;
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Adjusts the speed of camera zooming");
+        }
+    }
+    ImGui::End();
   }
 
   int frame_width_;
