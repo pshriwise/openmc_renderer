@@ -220,7 +220,7 @@ public:
 
         // Set camera to isometric position (equal angles to all axes)
         float distance = 15.0f;  // Distance from origin
-        float angle = 54.736f;   // arctan(sqrt(2)) in degrees - standard isometric angle
+        float angle = 120.0f;    // Angle from negative Z-axis (30 degrees from XY plane)
         float phi = 45.0f;       // Azimuthal angle
 
         // Convert spherical coordinates to Cartesian
@@ -243,7 +243,6 @@ public:
         updateVectors();
     }
 
-private:
     void applyRotation(openmc::Position& vec) const {
         // Apply quaternion rotation
         float x = vec[0], y = vec[1], z = vec[2];
@@ -263,6 +262,8 @@ private:
         vec[1] = 2*(xy + wz) * x + (1 - 2*(xx + zz)) * y + 2*(yz - wx) * z;
         vec[2] = 2*(xz - wy) * x + 2*(yz + wx) * y + (1 - 2*(xx + yy)) * z;
     }
+
+private:
 };
 
 class OpenMCRenderer {
@@ -304,6 +305,9 @@ public:
     framebufferSizeCallback(window_, frame_width_, frame_height_);
 
     texture_ = createTextureFromImageData(openmc_plotter_.create_image());
+
+    // Start in isometric view
+    camera_.setIsometricView();
     transferCameraInfo();
   }
 
