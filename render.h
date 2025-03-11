@@ -590,18 +590,22 @@ public:
         }
 
         // Convert color values from [0-255] to [0-1] for ImGui
-        float r = color.red / 255.0f;
-        float g = color.green / 255.0f;
-        float b = color.blue / 255.0f;
+        float color_array[3] = {
+            color.red / 255.0f,
+            color.green / 255.0f,
+            color.blue / 255.0f
+        };
 
-        // Draw a color square
-        if (ImGui::ColorButton(("##Color" + std::to_string(id)).c_str(), ImVec4(r, g, b, 1.0f))) {
-            selected_id = id;
+        ImGui::PushID(id);
+
+        // Color button that opens the picker
+        if (ImGui::ColorButton("##ColorBtn", ImVec4(color_array[0], color_array[1], color_array[2], 1.0f))) {
+            ImGui::OpenPopup("ColorPicker");
             temp_color = color;
-            ImGui::OpenPopup("Edit Color");
+            selected_id = id;
         }
-        ImGui::SameLine();
 
+        ImGui::SameLine();
         ImGui::Text("%s ID: %d", idPrefix.c_str(), id);
 
         // Add a visibility checkbox
@@ -611,36 +615,30 @@ public:
             currentVisibilityMap[id] = visibility;
             openmc_plotter_.set_material_visibility(id, visibility);
         }
-    }
 
-    // Color editing modal dialog
-    if (ImGui::BeginPopupModal("Edit Color", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        // Show color picker
-        float temp_r = temp_color.red / 255.0f;
-        float temp_g = temp_color.green / 255.0f;
-        float temp_b = temp_color.blue / 255.0f;
+        // Color picker popup
+        if (ImGui::BeginPopup("ColorPicker")) {
+            float temp_array[3] = {
+                temp_color.red / 255.0f,
+                temp_color.green / 255.0f,
+                temp_color.blue / 255.0f
+            };
 
-        if (ImGui::ColorEdit3((idPrefix + " Color").c_str(), &temp_r)) {
-            temp_color.red = static_cast<uint8_t>(temp_r * 255);
-            temp_color.green = static_cast<uint8_t>(temp_g * 255);
-            temp_color.blue = static_cast<uint8_t>(temp_b * 255);
+            if (ImGui::ColorPicker3("##picker", temp_array,
+                ImGuiColorEditFlags_DisplayRGB | ImGuiColorEditFlags_InputRGB)) {
+                temp_color.red = static_cast<uint8_t>(temp_array[0] * 255);
+                temp_color.green = static_cast<uint8_t>(temp_array[1] * 255);
+                temp_color.blue = static_cast<uint8_t>(temp_array[2] * 255);
+
+                // Apply color changes immediately
+                openmc_plotter_.set_color(selected_id, temp_color);
+                auto& targetCache = colorByMaterials ? materialColors : cellColors;
+                targetCache[selected_id] = temp_color;
+            }
+            ImGui::EndPopup();
         }
 
-        if (ImGui::Button("Save")) {
-            openmc_plotter_.set_color(selected_id, temp_color);
-            // Cache the color
-            auto& targetCache = colorByMaterials ? materialColors : cellColors;
-            targetCache[selected_id] = temp_color;
-            ImGui::CloseCurrentPopup();
-        }
-
-        ImGui::SameLine();
-
-        if (ImGui::Button("Cancel")) {
-            ImGui::CloseCurrentPopup();
-        }
-
-        ImGui::EndPopup();
+        ImGui::PopID();
     }
 
     ImGui::End();
