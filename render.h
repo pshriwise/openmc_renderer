@@ -25,6 +25,7 @@ public:
     float panY;
     float zoomSensitivity;  // Added zoom sensitivity control
     float panSensitivity;  // Added pan sensitivity control
+    float rotationSensitivity;  // Added rotation sensitivity control
 
     // Quaternion for rotation
     struct Quaternion {
@@ -76,7 +77,8 @@ public:
 
     Camera()
         : zoom(-5.0f), panX(0.0f), panY(0.0f),
-          zoomSensitivity(2.5f), panSensitivity(0.02f), fov(45.0) {
+          zoomSensitivity(2.5f), panSensitivity(0.02f),
+          rotationSensitivity(0.5f), fov(45.0) {  // Initialize rotation sensitivity
         position = {10, 10, 10};
         lookAt = {0.0, 0.0, 0.0};
         upVector = {0.0, 0.0, 1.0};
@@ -99,6 +101,10 @@ public:
     }
 
     void rotate(float deltaX, float deltaY) {
+        // Apply rotation sensitivity
+        deltaX *= rotationSensitivity;
+        deltaY *= rotationSensitivity;
+
         // Convert deltas to radians
         float radiansX = deltaX * M_PI / 180.0f;
         float radiansY = deltaY * M_PI / 180.0f;
@@ -613,7 +619,7 @@ public:
     const float windowWidth = ImGui::GetIO().DisplaySize.x;
     const float windowHeight = ImGui::GetIO().DisplaySize.y;
     const float settingsWidth = 300.0f;
-    const float settingsHeight = 120.0f;
+    const float settingsHeight = 150.0f;  // Increased height for new control
 
     // Position in the right third of the screen, below the top
     ImGui::SetNextWindowPos(
@@ -640,6 +646,15 @@ public:
         }
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip("Adjusts the speed of camera zooming");
+        }
+
+        // Rotation sensitivity slider (0.1 to 2.0)
+        float rotSens = camera_.rotationSensitivity;
+        if (ImGui::SliderFloat("Rotation Sensitivity", &rotSens, 0.1f, 2.0f, "%.2f")) {
+            camera_.rotationSensitivity = rotSens;
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Adjusts the speed of camera rotation");
         }
     }
     ImGui::End();
