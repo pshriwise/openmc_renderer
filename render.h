@@ -420,7 +420,7 @@ public:
         transferCameraInfo();
     }
     if (draggingMiddle) {
-        camera_.panX += (xpos - lastMouseX) * 0.01f;
+        camera_.panX -= (xpos - lastMouseX) * 0.01f;
         camera_.panY -= (ypos - lastMouseY) * 0.01f;
         lastMouseX = xpos;
         lastMouseY = ypos;
