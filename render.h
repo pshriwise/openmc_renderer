@@ -215,11 +215,14 @@ public:
     }
 
     void setIsometricView() {
+        // Calculate current distance from camera to look-at point
+        openmc::Position currentDir = getTransformedPosition() - getTransformedLookAt();
+        float currentDistance = currentDir.norm();
+
         // Reset rotation
         rotation = Quaternion();
 
         // Set camera to isometric position (equal angles to all axes)
-        float distance = 15.0f;  // Distance from origin
         float angle = 120.0f;    // Angle from negative Z-axis (30 degrees from XY plane)
         float phi = 45.0f;       // Azimuthal angle
 
@@ -228,15 +231,14 @@ public:
         float phiRad = phi * M_PI / 180.0f;
 
         position = {
-            distance * sin(theta) * cos(phiRad),
-            distance * sin(theta) * sin(phiRad),
-            distance * cos(theta)
+            currentDistance * sin(theta) * cos(phiRad),
+            currentDistance * sin(theta) * sin(phiRad),
+            currentDistance * cos(theta)
         };
 
         // Reset other parameters
         lookAt = {0.0, 0.0, 0.0};
         upVector = {0.0, 0.0, 1.0};
-        zoom = -5.0f;
         panX = 0.0f;
         panY = 0.0f;
 
@@ -261,6 +263,45 @@ public:
         vec[0] = (1 - 2*(yy + zz)) * x + 2*(xy - wz) * y + 2*(xz + wy) * z;
         vec[1] = 2*(xy + wz) * x + (1 - 2*(xx + zz)) * y + 2*(yz - wx) * z;
         vec[2] = 2*(xz - wy) * x + 2*(yz + wx) * y + (1 - 2*(xx + yy)) * z;
+    }
+
+    enum class Axis {
+        X,
+        Y,
+        Z
+    };
+
+    void setAxisView(Axis axis) {
+        // Calculate current distance from camera to look-at point
+        openmc::Position currentDir = getTransformedPosition() - getTransformedLookAt();
+        float currentDistance = currentDir.norm();
+
+        // Reset rotation
+        rotation = Quaternion();
+
+        // Set common parameters
+        position = {0.0f, 0.0f, 0.0f};
+        lookAt = {0.0, 0.0, 0.0};
+        panX = 0.0f;
+        panY = 0.0f;
+
+        // Set position and up vector based on axis
+        switch (axis) {
+            case Axis::X:
+                position[0] = currentDistance;  // Camera on positive X
+                upVector = {0.0, 0.0, 1.0};  // Z is up
+                break;
+            case Axis::Y:
+                position[1] = currentDistance;  // Camera on positive Y
+                upVector = {0.0, 0.0, 1.0};  // Z is up
+                break;
+            case Axis::Z:
+                position[2] = currentDistance;  // Camera on positive Z
+                upVector = {0.0, 1.0, 0.0};  // Y is up for top view
+                break;
+        }
+
+        updateVectors();
     }
 
 private:
@@ -670,6 +711,25 @@ public:
         if (renderer) {
             renderer->camera_.setIsometricView();
             renderer->transferCameraInfo();
+        }
+    }
+
+    // Handle orthographic views
+    auto renderer = static_cast<OpenMCRenderer*>(glfwGetWindowUserPointer(window));
+    if (renderer && action == GLFW_PRESS) {
+        switch (key) {
+            case GLFW_KEY_X:
+                renderer->camera_.setAxisView(Camera::Axis::X);
+                renderer->transferCameraInfo();
+                break;
+            case GLFW_KEY_Y:
+                renderer->camera_.setAxisView(Camera::Axis::Y);
+                renderer->transferCameraInfo();
+                break;
+            case GLFW_KEY_Z:
+                renderer->camera_.setAxisView(Camera::Axis::Z);
+                renderer->transferCameraInfo();
+                break;
         }
     }
   }
