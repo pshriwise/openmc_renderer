@@ -450,6 +450,7 @@ public:
         return;
     }
 
+    // Handle existing camera controls
     if (draggingLeft) {
         float deltaX = (xpos - lastMouseX) * 0.5f;
         float deltaY = (ypos - lastMouseY) * 0.5f;
@@ -598,7 +599,7 @@ public:
       }
   }
 
-  // Add key callback
+  // Modify key callback to remove 'Y' key handling
   static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
     if (key == GLFW_KEY_W && action == GLFW_PRESS && (mods & GLFW_MOD_CONTROL)) {
         glfwSetWindowShouldClose(window, GLFW_TRUE);
@@ -677,6 +678,64 @@ public:
 
   OpenMCPlotter& openmc_plotter_ {OpenMCPlotter::get_instance()};
   Camera camera_;
+
+  // Add this new method to convert screen coordinates to world ray direction
+  openmc::Direction screenToWorldDirection(double screenX, double screenY) {
+      // Convert screen coordinates to normalized device coordinates (-1 to 1)
+      float ndcX = (2.0f * screenX) / frame_width_ - 1.0f;
+      float ndcY = 1.0f - (2.0f * screenY) / frame_height_;
+
+      // Convert to view space considering FOV and aspect ratio
+      float aspectRatio = static_cast<float>(frame_width_) / frame_height_;
+      float tanHalfFov = tan(camera_.fov * 0.5f * M_PI / 180.0f);
+
+      openmc::Position viewRay = {
+          ndcX * aspectRatio * tanHalfFov,
+          ndcY * tanHalfFov,
+          -1.0  // Forward in view space is -Z
+      };
+
+      // Transform the ray direction from view space to world space
+      openmc::Position forward = camera_.getTransformedLookAt() - camera_.getTransformedPosition();
+      forward = forward / forward.norm();
+
+      openmc::Position right = forward.cross(camera_.getTransformedUpVector());
+      right = right / right.norm();
+
+      openmc::Position up = right.cross(forward);
+      up = up / up.norm();
+
+      // Construct world space direction
+      openmc::Direction worldDir = {
+          right[0] * viewRay[0] + up[0] * viewRay[1] + forward[0] * viewRay[2],
+          right[1] * viewRay[0] + up[1] * viewRay[1] + forward[1] * viewRay[2],
+          right[2] * viewRay[0] + up[2] * viewRay[1] + forward[2] * viewRay[2]
+      };
+
+      // Normalize the direction
+      float length = sqrt(worldDir[0] * worldDir[0] + worldDir[1] * worldDir[1] + worldDir[2] * worldDir[2]);
+      worldDir = worldDir / length;
+
+      return worldDir;
+  }
+
+  // Add this method to handle cursor movement and cell querying
+  void handleCursorQuery(double xpos, double ypos) {
+      // Skip if ImGui is handling this event
+      ImGuiIO& io = ImGui::GetIO();
+      if (!io.WantCaptureMouse) {
+          openmc::Position rayOrigin = camera_.getTransformedPosition();
+          openmc::Direction rayDir = screenToWorldDirection(xpos, ypos);
+
+          try {
+              int32_t cell_id = openmc_plotter_.query_cell(rayOrigin, rayDir);
+              // For now, just print the cell ID - we can enhance this later
+              std::cout << "Cell ID at cursor: " << cell_id << std::endl;
+          } catch (const std::exception& e) {
+              // Silently handle cases where we might be pointing outside the geometry
+          }
+      }
+  }
 };
 
 

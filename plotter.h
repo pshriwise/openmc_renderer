@@ -127,6 +127,45 @@ public:
     plot()->horizontal_field_of_view() = fov;
   }
 
+  int32_t query_cell(openmc::Position position, openmc::Direction direction) {
+    // fire a ray into the geometry and get the cell ID on the other side
+    // of the first surface
+    openmc::GeometryState g;
+    g.r() = position;
+    g.u() = direction;
+    g.coord(0).universe = openmc::model::root_universe;
+
+    std::cout << "Position: " << g.r() << std::endl;
+    std::cout << "Direction: " << g.u() << std::endl;
+
+    // attempt to find the cell, move the ray up to the
+    // model boundary if necessary
+    if (!openmc::exhaustive_find_cell(g)) {
+      g.advance_to_boundary_from_void();
+      openmc::exhaustive_find_cell(g);
+    }
+    std::cout << "Cell ID: " << g.lowest_coord().cell << std::endl;
+
+    int32_t cell_id = openmc::model::cells[g.lowest_coord().cell]->id_;
+    // if this cell ID isn't visible, continue the ray until we find a visible cell
+    while (plot()->opaque_ids().count(cell_id) == 0) {
+      auto boundary = openmc::distance_to_boundary(g);
+      // move the ray forward by the distance to the boundary
+      g.move_distance(boundary.distance);
+      g.surface() = boundary.surface_index;
+      g.n_coord_last() = g.n_coord();
+      g.n_coord() = boundary.coord_level;
+      if (boundary.lattice_translation[0] != 0 || boundary.lattice_translation[1] != 0 || boundary.lattice_translation[2] != 0) {
+        openmc::cross_lattice(g, boundary);
+      }
+      return -1;
+      openmc::exhaustive_find_cell(g);
+      cell_id = openmc::model::cells[g.lowest_coord().cell]->id_;
+    }
+    std::cout << "Cell ID: " << cell_id << std::endl;
+    return cell_id;
+  }
+
 private:
   std::unique_ptr<openmc::PhongPlot> plot_;
 };
