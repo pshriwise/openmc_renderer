@@ -20,36 +20,123 @@
 
 class Camera {
 public:
-    float rotationX;
-    float rotationY;
     float zoom;
     float panX;
     float panY;
 
-    // New fields
+    // Quaternion for rotation
+    struct Quaternion {
+        float w, x, y, z;
+
+        Quaternion() : w(1.0f), x(0.0f), y(0.0f), z(0.0f) {}
+
+        Quaternion(float w, float x, float y, float z)
+            : w(w), x(x), y(y), z(z) {}
+
+        static Quaternion fromAxisAngle(float angle, float ax, float ay, float az) {
+            float halfAngle = angle * 0.5f;
+            float s = std::sin(halfAngle);
+            float length = std::sqrt(ax * ax + ay * ay + az * az);
+            if (length > 0.0f) {
+                s /= length;
+            }
+            return Quaternion(std::cos(halfAngle), ax * s, ay * s, az * s);
+        }
+
+        void normalize() {
+            float len = std::sqrt(w*w + x*x + y*y + z*z);
+            if (len > 0) {
+                w /= len;
+                x /= len;
+                y /= len;
+                z /= len;
+            }
+        }
+
+        Quaternion operator*(const Quaternion& q) const {
+            return Quaternion(
+                w*q.w - x*q.x - y*q.y - z*q.z,
+                w*q.x + x*q.w + y*q.z - z*q.y,
+                w*q.y - x*q.z + y*q.w + z*q.x,
+                w*q.z + x*q.y - y*q.x + z*q.w
+            );
+        }
+    };
+
+    // Camera properties
     double fov;
     openmc::Position position;
     openmc::Position lookAt;
     openmc::Position upVector;
-    openmc::Position lightPosition {0, 10 , -10};
+    openmc::Position lightPosition {0, 10, -10};
+    Quaternion rotation;
+    openmc::Position right;  // Added to track right vector
 
     Camera()
-        : rotationX(0.0f), rotationY(0.0f), zoom(-5.0f), panX(0.0f), panY(0.0f),
-          fov(45.0)  {
-            position = {10, 10, 10};
-            lookAt = {0.0, 0.0, 0.0};
-            upVector = {0.0, 0.0, 1.0};
-          }
+        : zoom(-5.0f), panX(0.0f), panY(0.0f), fov(45.0) {
+        position = {10, 10, 10};
+        lookAt = {0.0, 0.0, 0.0};
+        upVector = {0.0, 0.0, 1.0};
+        rotation = Quaternion();
+        updateVectors();
+    }
+
+    void updateVectors() {
+        // Calculate the forward vector (camera direction)
+        openmc::Position forward = lookAt - position;
+        forward = forward / forward.norm();
+
+        // Calculate the right vector
+        right = forward.cross(upVector);
+        right = right / right.norm();
+
+        // Recalculate up vector to ensure orthogonality
+        upVector = right.cross(forward);
+        upVector = upVector / upVector.norm();
+    }
+
+    void rotate(float deltaX, float deltaY) {
+        // Convert deltas to radians
+        float radiansX = deltaX * M_PI / 180.0f;
+        float radiansY = deltaY * M_PI / 180.0f;
+
+        // Create rotation quaternions around right and up vectors
+        Quaternion pitchRotation = Quaternion::fromAxisAngle(radiansY, right[0], right[1], right[2]);
+        Quaternion yawRotation = Quaternion::fromAxisAngle(radiansX, upVector[0], upVector[1], upVector[2]);
+
+        // Combine rotations
+        rotation = yawRotation * pitchRotation * rotation;
+        rotation.normalize();
+
+        // Update camera vectors after rotation
+        updateVectors();
+    }
 
     void applyTransformations() {
         glLoadIdentity();
 
-        // Adjust position and lookAt with panning
-        openmc::Position adjustedPosition = position;
-        openmc::Position adjustedLookAt = lookAt;
+        // Calculate view-aligned pan offsets
+        openmc::Position forward = lookAt - position;
+        forward = forward / forward.norm();
 
-        applyPanAndRotation(adjustedPosition);
-        applyPanAndRotation(adjustedLookAt);
+        openmc::Position viewRight = forward.cross(upVector);
+        viewRight = viewRight / viewRight.norm();
+
+        openmc::Position viewUp = viewRight.cross(forward);
+        viewUp = viewUp / viewUp.norm();
+
+        // Apply pan offset to both position and lookAt
+        openmc::Position adjustedPosition = position + viewRight * panX + viewUp * panY;
+        openmc::Position adjustedLookAt = lookAt + viewRight * panX + viewUp * panY;
+
+        // Apply zoom to position (camera moves along view direction)
+        openmc::Position zoomedDirection = (adjustedLookAt - adjustedPosition);
+        zoomedDirection = zoomedDirection / zoomedDirection.norm();
+        adjustedPosition = adjustedPosition + zoomedDirection * zoom;
+
+        // Apply rotation
+        applyRotation(adjustedPosition);
+        applyRotation(adjustedLookAt);
 
         gluLookAt(adjustedPosition[0], adjustedPosition[1], adjustedPosition[2],
                 adjustedLookAt[0], adjustedLookAt[1], adjustedLookAt[2],
@@ -64,56 +151,80 @@ public:
     }
 
     openmc::Position getTransformedPosition() const {
-        openmc::Position transformedPosition = position + (lookAt - position) * zoom;
-        applyPanAndRotation(transformedPosition);
+        // Calculate view-aligned pan offsets
+        openmc::Position forward = lookAt - position;
+        forward = forward / forward.norm();
+
+        openmc::Position viewRight = forward.cross(upVector);
+        viewRight = viewRight / viewRight.norm();
+
+        openmc::Position viewUp = viewRight.cross(forward);
+        viewUp = viewUp / viewUp.norm();
+
+        // Start with base position
+        openmc::Position transformedPosition = position;
+
+        // Apply pan offset
+        transformedPosition = transformedPosition + viewRight * panX + viewUp * panY;
+
+        // Apply zoom after panning
+        openmc::Position zoomedDirection = (lookAt - position);
+        zoomedDirection = zoomedDirection / zoomedDirection.norm();
+        transformedPosition = transformedPosition + zoomedDirection * zoom;
+
+        // Apply rotation
+        applyRotation(transformedPosition);
         return transformedPosition;
     }
 
     openmc::Position getTransformedLookAt() const {
+        // Calculate view-aligned pan offsets
+        openmc::Position forward = lookAt - position;
+        forward = forward / forward.norm();
+
+        openmc::Position viewRight = forward.cross(upVector);
+        viewRight = viewRight / viewRight.norm();
+
+        openmc::Position viewUp = viewRight.cross(forward);
+        viewUp = viewUp / viewUp.norm();
+
+        // Start with base lookAt
         openmc::Position transformedLookAt = lookAt;
-        applyPanAndRotation(transformedLookAt);
+
+        // Apply pan offset
+        transformedLookAt = transformedLookAt + viewRight * panX + viewUp * panY;
+
+        // Apply rotation
+        applyRotation(transformedLookAt);
         return transformedLookAt;
     }
 
     openmc::Position getTransformedUpVector() const {
         openmc::Position transformedUp = upVector;
-        applyPanAndRotation(transformedUp);
+        applyRotation(transformedUp);
         return transformedUp;
     }
 
 private:
-    void applyPanAndRotation(openmc::Position& vec) const {
-        // Calculate the forward vector (camera direction)
-        openmc::Position forward = lookAt - position;
-        forward = forward / forward.norm(); // Normalize
+    void applyRotation(openmc::Position& vec) const {
+        // Apply quaternion rotation
+        float x = vec[0], y = vec[1], z = vec[2];
 
-        // Calculate the right vector (cross product of forward and up)
-        openmc::Position right = forward.cross(upVector);
-        right = right / right.norm(); // Normalize
+        // Convert quaternion to rotation matrix and apply
+        float wx = rotation.w * rotation.x;
+        float wy = rotation.w * rotation.y;
+        float wz = rotation.w * rotation.z;
+        float xx = rotation.x * rotation.x;
+        float xy = rotation.x * rotation.y;
+        float xz = rotation.x * rotation.z;
+        float yy = rotation.y * rotation.y;
+        float yz = rotation.y * rotation.z;
+        float zz = rotation.z * rotation.z;
 
-        // Calculate the true up vector (cross product of right and forward)
-        openmc::Position trueUp = right.cross(forward);
-
-        // Apply pan in the view plane
-        vec = vec + panY * right + panX * trueUp;
-
-        // Apply rotation (yaw and pitch)
-        double cosY = std::cos(rotationY * M_PI / 180.0);
-        double sinY = std::sin(rotationY * M_PI / 180.0);
-        double cosX = std::cos(rotationX * M_PI / 180.0);
-        double sinX = std::sin(rotationX * M_PI / 180.0);
-
-        double x = vec[0] * cosY - vec[2] * sinY;
-        double z = vec[0] * sinY + vec[2] * cosY;
-        vec[0] = x;
-        vec[2] = z;
-
-        double y = vec[1] * cosX - vec[2] * sinX;
-        z = vec[1] * sinX + vec[2] * cosX;
-        vec[1] = y;
-        vec[2] = z;
+        vec[0] = (1 - 2*(yy + zz)) * x + 2*(xy - wz) * y + 2*(xz + wy) * z;
+        vec[1] = 2*(xy + wz) * x + (1 - 2*(xx + zz)) * y + 2*(yz - wx) * z;
+        vec[2] = 2*(xz - wy) * x + 2*(yz + wx) * y + (1 - 2*(xx + yy)) * z;
     }
-
 };
 
 class OpenMCRenderer {
@@ -137,8 +248,8 @@ public:
     glfwSetCursorPosCallback(window_, cursorPositionCallback);
     glfwSetScrollCallback(window_, scrollCallback);
     glfwSetFramebufferSizeCallback(window_, framebufferSizeCallback);
+    glfwSetKeyCallback(window_, keyCallback);
     glfwSetWindowUserPointer(window_, this);
-
 
     // Create ImGui context
     ImGui::CreateContext();
@@ -147,7 +258,7 @@ public:
     ImGui::StyleColorsDark();
 
     ImGui_ImplGlfw_InitForOpenGL(window_, true);
-    ImGui_ImplOpenGL3_Init("#version 460"); // Replace with your OpenGL version
+    ImGui_ImplOpenGL3_Init("#version 460");
 
     glEnable(GL_DEPTH_TEST);
 
@@ -175,7 +286,7 @@ public:
         displayColorLegend();
 
         // Update the texture with new image data if the camera has changed
-        auto newImageData = openmc_plotter_.create_image(); // Assume this generates a new image based on the camera
+        auto newImageData = openmc_plotter_.create_image();
         updateTexture(newImageData);
 
         // Draw the background
@@ -183,7 +294,7 @@ public:
 
         glfwPollEvents();
 
-        //  // Render Dear ImGui
+        // Render Dear ImGui
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
@@ -288,18 +399,21 @@ public:
   }
 
   void cursorPositionUpdate(double xpos, double ypos) {
-      if (draggingLeft) {
-          camera_.rotationX -= (ypos - lastMouseY) * 0.5f;
-          camera_.rotationY -= (xpos - lastMouseX) * 0.5f;
-          lastMouseX = xpos;
-          lastMouseY = ypos;
-      }
-      if (draggingMiddle) {
-          camera_.panX += (xpos - lastMouseX) * 0.01f;
-          camera_.panY -= (ypos - lastMouseY) * 0.01f;
-          lastMouseX = xpos;
-          lastMouseY = ypos;
-      }
+    if (draggingLeft) {
+        float deltaX = (xpos - lastMouseX) * 0.5f;
+        float deltaY = (ypos - lastMouseY) * 0.5f;
+        camera_.rotate(deltaX, deltaY);
+        lastMouseX = xpos;
+        lastMouseY = ypos;
+        transferCameraInfo();
+    }
+    if (draggingMiddle) {
+        camera_.panX += (xpos - lastMouseX) * 0.01f;
+        camera_.panY -= (ypos - lastMouseY) * 0.01f;
+        lastMouseX = xpos;
+        lastMouseY = ypos;
+        transferCameraInfo();
+    }
   }
 
 
@@ -313,6 +427,15 @@ public:
 
   void scrollUpdate(double xoffset, double yoffset) {
       camera_.zoom += yoffset;
+      transferCameraInfo();
+  }
+
+  void transferCameraInfo() {
+      openmc_plotter_.set_camera_position(camera_.getTransformedPosition());
+      openmc_plotter_.set_look_at(camera_.getTransformedLookAt());
+      openmc_plotter_.set_up_vector(camera_.getTransformedUpVector());
+      openmc_plotter_.set_field_of_view(camera_.fov);
+      openmc_plotter_.set_light_position(camera_.lightPosition);
   }
 
   // using VisibilityCallback = std::function<void(int32_t, bool)>;
@@ -418,11 +541,11 @@ public:
       }
   }
 
-  void transferCameraInfo() {
-      openmc_plotter_.set_camera_position(camera_.getTransformedPosition());
-      openmc_plotter_.set_look_at(camera_.getTransformedLookAt());
-      openmc_plotter_.set_light_position(camera_.lightPosition);
-      openmc_plotter_.set_field_of_view(camera_.fov);
+  // Add key callback
+  static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+    if (key == GLFW_KEY_W && action == GLFW_PRESS && (mods & GLFW_MOD_CONTROL)) {
+        glfwSetWindowShouldClose(window, GLFW_TRUE);
+    }
   }
 
   int frame_width_;
