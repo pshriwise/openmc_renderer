@@ -371,6 +371,12 @@ public:
   }
 
   void mouseButtonUpdate(int button, int action, int mods) {
+    // Skip if ImGui is handling this event
+    ImGuiIO& io = ImGui::GetIO();
+    if (io.WantCaptureMouse) {
+        return;
+    }
+
     if (button == GLFW_MOUSE_BUTTON_LEFT) {
       if (action == GLFW_PRESS) {
         draggingLeft = true;
@@ -399,6 +405,12 @@ public:
   }
 
   void cursorPositionUpdate(double xpos, double ypos) {
+    // Skip if ImGui is handling this event
+    ImGuiIO& io = ImGui::GetIO();
+    if (io.WantCaptureMouse) {
+        return;
+    }
+
     if (draggingLeft) {
         float deltaX = (xpos - lastMouseX) * 0.5f;
         float deltaY = (ypos - lastMouseY) * 0.5f;
@@ -426,6 +438,12 @@ public:
   }
 
   void scrollUpdate(double xoffset, double yoffset) {
+      // Skip if ImGui is handling this event
+      ImGuiIO& io = ImGui::GetIO();
+      if (io.WantCaptureMouse) {
+          return;
+      }
+
       camera_.zoom += yoffset;
       transferCameraInfo();
   }
