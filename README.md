@@ -3,7 +3,7 @@ Basic rendering app for OpenMC Geometry
 
 A real-timey 3D visualization tool for OpenMC geometry models. This application provides interactive viewing of OpenMC geometries with features like dynamic lighting, material/cell coloring, and geometry querying.
 
-[Watch Video Demo](https://youtu.be/dd3uzOabIdU)
+🎥 [Watch Video Demo](https://youtu.be/dd3uzOabIdU)
 
 ![](assets/hero.png)
 
