@@ -41,6 +41,11 @@ public:
     }
   }
 
+  void set_pixels(int32_t width, int32_t height) {
+    plot()->pixels()[0] = width;
+    plot()->pixels()[1] = height;
+  }
+
   openmc::ImageData create_image() {
     auto img = xt::transpose(plot()->create_image());
     return img;

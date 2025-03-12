@@ -316,6 +316,9 @@ public:
   // Add state for light control
   bool light_control_mode = false;
   bool light_follows_camera = true;  // Set to true by default
+  // Add image dimension state
+  int image_width_ = 800;
+  int image_height_ = 600;
 
   OpenMCRenderer(int argc, char* argv[]) {
     openmc_plotter_.initialize(argc, argv);
@@ -441,8 +444,8 @@ public:
 
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, imageData.data());
 
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
@@ -895,6 +898,37 @@ public:
     ImGui::SetNextWindowCollapsed(true, ImGuiCond_FirstUseEver);
 
     if (ImGui::Begin("Camera Settings")) {
+        // Resolution controls
+        ImGui::Text("Image Resolution");
+        static int square_resolution = 800;  // Default value
+        ImGui::SetNextItemWidth(100);
+        ImGui::InputInt("Square Resolution", &square_resolution, 32, 128);
+        ImGui::SameLine();
+        if (ImGui::Button("Update")) {
+            // Clamp to reasonable values
+            square_resolution = std::max(32, std::min(4096, square_resolution));
+
+            // Delete existing texture
+            glDeleteTextures(1, &texture_);
+            glFinish();  // Ensure deletion is complete
+
+            // Update plotter dimensions
+            openmc_plotter_.set_pixels(square_resolution, square_resolution);
+
+            // Get new image data and create new texture
+            auto newImageData = openmc_plotter_.create_image();
+            texture_ = createTextureFromImageData(newImageData);
+
+            // Update stored dimensions
+            image_width_ = square_resolution;
+            image_height_ = square_resolution;
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Set both width and height to this value");
+        }
+
+        ImGui::Separator();
+
         // Light follows camera checkbox
         if (ImGui::Checkbox("Light Follows Camera", &light_follows_camera)) {
             if (light_follows_camera) {
