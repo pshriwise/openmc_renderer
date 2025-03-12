@@ -515,6 +515,14 @@ public:
         draggingMiddle = false;
       }
     }
+    if (button == GLFW_MOUSE_BUTTON_RIGHT) {
+      if (action == GLFW_PRESS) {
+        draggingRight = true;
+        glfwGetCursorPos(window_, &lastMouseX, &lastMouseY);
+      } else if (action == GLFW_RELEASE) {
+        draggingRight = false;
+      }
+    }
   }
 
   // Mouse motion callback
@@ -590,6 +598,32 @@ public:
         if (draggingMiddle) {
             camera_.panX -= (xpos - lastMouseX) * camera_.panSensitivity;
             camera_.panY -= (ypos - lastMouseY) * camera_.panSensitivity;
+            lastMouseX = xpos;
+            lastMouseY = ypos;
+            transferCameraInfo();
+        }
+        if (draggingRight) {
+            // Calculate rotation angle based on both horizontal and vertical mouse movement
+            float deltaX = -(xpos - lastMouseX) * 0.5f;  // Negative to flip horizontal direction
+            float deltaY = (ypos - lastMouseY) * 0.5f;   // Positive for vertical direction
+
+            // Use the larger of the two movements for smoother rotation
+            float delta = std::abs(deltaX) > std::abs(deltaY) ? deltaX : deltaY;
+
+            // Create rotation quaternion around the view direction
+            openmc::Position forward = camera_.getTransformedLookAt() - camera_.getTransformedPosition();
+            forward = forward / forward.norm();
+
+            // Create rotation quaternion for in-plane rotation
+            Camera::Quaternion viewRotation = Camera::Quaternion::fromAxisAngle(
+                delta * M_PI / 180.0f,
+                forward[0], forward[1], forward[2]
+            );
+
+            // Apply the rotation
+            camera_.rotation = viewRotation * camera_.rotation;
+            camera_.rotation.normalize();
+
             lastMouseX = xpos;
             lastMouseY = ypos;
             transferCameraInfo();
@@ -988,6 +1022,7 @@ public:
   // Data members
   bool draggingLeft {false};
   bool draggingMiddle {false};
+  bool draggingRight {false};  // Add tracking for right mouse button
   double lastMouseX;
   double lastMouseY;
 
@@ -1083,15 +1118,8 @@ public:
           ImGui::Text("Camera Controls:");
           ImGui::BulletText("Left Mouse Button + Drag: Rotate camera");
           ImGui::BulletText("Middle Mouse Button + Drag: Pan camera");
+          ImGui::BulletText("Right Mouse Button + Drag: Rotate view in-plane (CCW/CW)");
           ImGui::BulletText("Mouse Wheel: Zoom in/out");
-
-          ImGui::Spacing();
-          ImGui::Text("Light Controls:");
-          ImGui::BulletText("Hold L + Left Mouse Button: Rotate light around model");
-          ImGui::BulletText("Hold L + Middle Mouse Button: Move light closer/further");
-
-          ImGui::Spacing();
-          ImGui::Text("View Shortcuts:");
           ImGui::BulletText("I: Reset to isometric view");
           ImGui::BulletText("X: View along X axis (positive direction)");
           ImGui::BulletText("Y: View along Y axis (positive direction)");
@@ -1101,10 +1129,28 @@ public:
           ImGui::BulletText("Shift + Z: View along Z axis (negative direction)");
 
           ImGui::Spacing();
-          ImGui::Text("General Controls:");
+          ImGui::Text("Light Controls:");
+          ImGui::BulletText("Hold L + Left Mouse Button: Rotate light around model");
+          ImGui::BulletText("Hold L + Middle Mouse Button: Move light closer/further");
+          ImGui::BulletText("Shift + L: Toggle light follows camera mode");
+
+          ImGui::Spacing();
+          ImGui::Text("Geometry Query Controls:");
+          ImGui::BulletText("Q: Query cell ID at cursor position");
+          ImGui::BulletText("ESC: Close cell query display");
+
+          ImGui::Spacing();
+          ImGui::Text("Display Controls:");
           ImGui::BulletText("?: Toggle this help overlay");
-          ImGui::BulletText("Esc: Close overlay or exit application");
+          ImGui::BulletText("ESC: Close overlay or exit application");
           ImGui::BulletText("Ctrl + W/Q: Exit application");
+
+          ImGui::Spacing();
+          ImGui::Text("Interface Features:");
+          ImGui::BulletText("Color Legend: Toggle between material and cell coloring");
+          ImGui::BulletText("Material/Cell Visibility: Toggle visibility of items");
+          ImGui::BulletText("Color Customization: Click color swatches to edit");
+          ImGui::BulletText("Camera Settings: Adjust resolution and sensitivities");
 
           ImGui::Spacing();
           ImGui::Text("Press ESC or click anywhere to close this overlay");

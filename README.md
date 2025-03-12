@@ -25,6 +25,7 @@ sudo apt-get install build-essential
 ### Camera Controls
 - **Left Mouse Button + Drag**: Rotate camera around model
 - **Middle Mouse Button + Drag**: Pan camera
+- **Right Mouse Button + Drag**: Rotate view in-plane
 - **Mouse Wheel**: Zoom in/out
 - **I**: Reset to isometric view
 - **X**: View along X axis (positive direction)
