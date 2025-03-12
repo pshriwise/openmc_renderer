@@ -908,7 +908,7 @@ public:
         ImGui::Text("Image Resolution");
         static int square_resolution = 800;  // Default value
         ImGui::SetNextItemWidth(100);
-        ImGui::InputInt("Square Resolution", &square_resolution, 32, 128);
+        ImGui::InputInt("##Resolution", &square_resolution, 32, 128);
         ImGui::SameLine();
         if (ImGui::Button("Update")) {
             // Clamp to reasonable values
