@@ -315,6 +315,7 @@ class OpenMCRenderer {
 public:
   // Add state for light control
   bool light_control_mode = false;
+  bool light_follows_camera = true;  // Set to true by default
 
   OpenMCRenderer(int argc, char* argv[]) {
     openmc_plotter_.initialize(argc, argv);
@@ -355,6 +356,8 @@ public:
 
     // Start in isometric view
     camera_.setIsometricView();
+    // Initialize light position to camera position since light follows camera is enabled by default
+    camera_.lightPosition = camera_.getTransformedPosition();
     transferCameraInfo();
 
     // Add help overlay state and show it on startup
@@ -639,6 +642,11 @@ public:
       openmc_plotter_.set_look_at(camera_.getTransformedLookAt());
       openmc_plotter_.set_up_vector(camera_.getTransformedUpVector());
       openmc_plotter_.set_field_of_view(camera_.fov);
+
+      // Update light position if it follows the camera
+      if (light_follows_camera && !light_control_mode) {
+          camera_.lightPosition = camera_.getTransformedPosition();
+      }
       openmc_plotter_.set_light_position(camera_.lightPosition);
   }
 
@@ -822,8 +830,17 @@ public:
     // Handle light control mode with 'L' key
     if (key == GLFW_KEY_L) {
         if (action == GLFW_PRESS) {
-            renderer->light_control_mode = true;
-        } else if (action == GLFW_RELEASE) {
+            if (mods & GLFW_MOD_SHIFT) {
+                // Toggle light follows camera mode
+                renderer->light_follows_camera = !renderer->light_follows_camera;
+                if (renderer->light_follows_camera) {
+                    renderer->camera_.lightPosition = renderer->camera_.getTransformedPosition();
+                }
+                renderer->transferCameraInfo();
+            } else {
+                renderer->light_control_mode = true;
+            }
+        } else if (action == GLFW_RELEASE && !(mods & GLFW_MOD_SHIFT)) {
             renderer->light_control_mode = false;
         }
         return;
@@ -867,7 +884,7 @@ public:
     const float windowWidth = ImGui::GetIO().DisplaySize.x;
     const float windowHeight = ImGui::GetIO().DisplaySize.y;
     const float settingsWidth = 300.0f;
-    const float settingsHeight = 150.0f;  // Increased height for new control
+    const float settingsHeight = 180.0f;  // Increased height for new control
 
     // Position in the right third of the screen, below the top
     ImGui::SetNextWindowPos(
@@ -878,6 +895,20 @@ public:
     ImGui::SetNextWindowCollapsed(true, ImGuiCond_FirstUseEver);
 
     if (ImGui::Begin("Camera Settings")) {
+        // Light follows camera checkbox
+        if (ImGui::Checkbox("Light Follows Camera", &light_follows_camera)) {
+            if (light_follows_camera) {
+                // Update light position immediately when enabled
+                camera_.lightPosition = camera_.getTransformedPosition();
+                transferCameraInfo();
+            }
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("When enabled, light source moves with camera (Shift+L to toggle)");
+        }
+
+        ImGui::Separator();
+
         // Pan sensitivity
         ImGui::Text("Pan Sensitivity");
         float panSens = camera_.panSensitivity;
