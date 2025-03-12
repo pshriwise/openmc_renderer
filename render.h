@@ -634,7 +634,13 @@ public:
           }
       } else {
           // Only update camera zoom when not in light control mode
-          camera_.zoom -= zoomFactor;  // Invert zoom direction for more intuitive control
+          float newZoom = camera_.zoom - zoomFactor;  // Calculate potential new zoom value
+
+          // Prevent zooming too close (through the look-at point)
+          // -0.5f provides a reasonable minimum distance
+          if (newZoom <= -0.5f) {
+              camera_.zoom = newZoom;
+          }
       }
 
       transferCameraInfo();
