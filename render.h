@@ -574,7 +574,7 @@ public:
     } else {
         // Handle existing camera controls
         if (draggingLeft) {
-            float deltaX = (xpos - lastMouseX) * 0.5f;
+            float deltaX = -(xpos - lastMouseX) * 0.5f;
             float deltaY = (ypos - lastMouseY) * 0.5f;
             camera_.rotate(deltaX, deltaY);
             lastMouseX = xpos;
