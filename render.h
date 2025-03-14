@@ -1,8 +1,8 @@
 #include <iostream>
 #include <stdexcept>
 
+#include <glad/glad.h>
 #include <GLFW/glfw3.h>
-#include <GL/glu.h>
 #include <vector>
 #include <xtensor/xarray.hpp>
 #include <xtensor/xio.hpp>
@@ -17,6 +17,7 @@
 #include "imguiwrap.helpers.h"
 
 #include "plotter.h"
+#include "shaders.h"
 
 class Camera {
 public:
@@ -122,8 +123,6 @@ public:
     }
 
     void applyTransformations() {
-        glLoadIdentity();
-
         // Calculate view-aligned pan offsets
         openmc::Position forward = lookAt - position;
         forward = forward / forward.norm();
@@ -146,17 +145,6 @@ public:
         // Apply rotation
         applyRotation(adjustedPosition);
         applyRotation(adjustedLookAt);
-
-        gluLookAt(adjustedPosition[0], adjustedPosition[1], adjustedPosition[2],
-                adjustedLookAt[0], adjustedLookAt[1], adjustedLookAt[2],
-                upVector[0], upVector[1], upVector[2]);
-    }
-
-    void updateView(int width, int height) {
-        glMatrixMode(GL_PROJECTION);
-        glLoadIdentity();
-        gluPerspective(fov, static_cast<double>(width) / height, 1.0, 500.0);
-        glMatrixMode(GL_MODELVIEW);
     }
 
     openmc::Position getTransformedPosition() const {
@@ -341,6 +329,12 @@ public:
     glfwSetKeyCallback(window_, keyCallback);
     glfwSetWindowUserPointer(window_, this);
 
+    if (!gladLoadGLLoader((GLADloadproc) glfwGetProcAddress))
+    {
+      throw std::runtime_error("Failed to load a graphics context!");
+      glfwTerminate();
+    }
+
     // Create ImGui context
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
@@ -349,8 +343,6 @@ public:
 
     ImGui_ImplGlfw_InitForOpenGL(window_, true);
     ImGui_ImplOpenGL3_Init("#version 410");
-
-    glEnable(GL_DEPTH_TEST);
 
     glfwGetFramebufferSize(window_, &frame_width_, &frame_height_);
     framebufferSizeCallback(window_, frame_width_, frame_height_);
@@ -365,11 +357,41 @@ public:
 
     // Add help overlay state and show it on startup
     show_help_overlay = true;
+
+    // Compile and link the fullscreen quad shader
+    shader_prog_id_ = glCreateProgram();
+    GLuint vert_id = compileShader(vertex_shader, GL_VERTEX_SHADER);
+    GLuint frag_id = compileShader(fragment_shader, GL_FRAGMENT_SHADER);
+
+    glAttachShader(shader_prog_id_, vert_id);
+    glAttachShader(shader_prog_id_, frag_id);
+    glLinkProgram(shader_prog_id_);
+
+    // Check to see if the link succeeded.
+    int result;
+    char* buffer;
+    glGetProgramiv(shader_prog_id_, GL_LINK_STATUS, &result);
+    if (result != GL_TRUE)
+	{
+      glGetProgramiv(shader_prog_id_, GL_INFO_LOG_LENGTH, &result);
+      buffer = new char[result];
+	  glGetProgramInfoLog(shader_prog_id_, result, 0, buffer);
+
+      std::cerr << "Shader link error:\n" << std::string(buffer) << std::endl;
+
+      delete[] buffer;
+    }
+    // We can safely delete the shaders since they've been linked into one binary.
+    glDeleteShader(vert_id);
+    glDeleteShader(frag_id);
+
+    // Create an empty vertex array object to use for drawing a fullscreen pass
+    glGenVertexArrays(1, &empty_vao_);
   }
 
   void render() {
        while (!glfwWindowShouldClose(window_)) {
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT);
 
         camera_.applyTransformations();
         transferCameraInfo();
@@ -424,12 +446,37 @@ public:
     }
   }
 
+  GLuint compileShader(const char* source, GLenum stage) {
+    // Compile the source.
+    GLuint shader_id = glCreateShader(stage);
+    glShaderSource(shader_id, 1, (const  GLchar**) &source, nullptr);
+    glCompileShader(shader_id);
+
+    // Check to see if the compilation succeeded.
+    int result;
+    char* buffer;
+    glGetShaderiv(shader_id, GL_COMPILE_STATUS, &result);
+    if (result != GL_TRUE)
+    {
+      glGetShaderiv(shader_id, GL_INFO_LOG_LENGTH, &result);
+      buffer = new char[result];
+      glGetShaderInfoLog(shader_id, result, 0, buffer);
+
+      std::cerr << "Shader compiler error:\n" << std::string(buffer) << std::endl;
+
+      delete[] buffer;
+    }
+
+    return shader_id;
+  }
+
   void updateTexture(const openmc::ImageData& imageData) {
     int width = imageData.shape()[0];
     int height = imageData.shape()[1];
 
     glBindTexture(GL_TEXTURE_2D, texture_);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, imageData.data());
+    glBindTexture(GL_TEXTURE_2D, 0);
   }
 
 
@@ -448,38 +495,24 @@ public:
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glBindTexture(GL_TEXTURE_2D, 0);
 
     return texture;
   }
 
     // Function to draw the background
   void drawBackground() {
-      glDisable(GL_DEPTH_TEST);
-      glMatrixMode(GL_PROJECTION);
-      glPushMatrix();
-      glLoadIdentity();
-      glOrtho(0, 1, 0, 1, -1, 1);
-      glMatrixMode(GL_MODELVIEW);
-      glPushMatrix();
-      glLoadIdentity();
+      glUseProgram(shader_prog_id_);
+      glBindVertexArray(empty_vao_);
 
-      glEnable(GL_TEXTURE_2D);
+      glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, texture_);
+      glUniform2i(glGetUniformLocation(shader_prog_id_, "u_fb_size"), frame_width_, frame_height_);
+      glDrawArrays(GL_TRIANGLES, 0, 3);
 
-      glBegin(GL_QUADS);
-      glTexCoord2f(0.0f, 0.0f); glVertex2f(0.0f, 0.0f);
-      glTexCoord2f(1.0f, 0.0f); glVertex2f(1.0f, 0.0f);
-      glTexCoord2f(1.0f, 1.0f); glVertex2f(1.0f, 1.0f);
-      glTexCoord2f(0.0f, 1.0f); glVertex2f(0.0f, 1.0f);
-      glEnd();
-
-      glDisable(GL_TEXTURE_2D);
-
-      glMatrixMode(GL_PROJECTION);
-      glPopMatrix();
-      glMatrixMode(GL_MODELVIEW);
-      glPopMatrix();
-      glEnable(GL_DEPTH_TEST);
+      glBindTexture(GL_TEXTURE_2D, 0);
+      glBindVertexArray(0);
+      glUseProgram(0);
   }
 
   // Callbacks
@@ -713,7 +746,8 @@ public:
 
   void framebufferUpdate(int width, int height) {
       glViewport(0, 0, width, height);
-      camera_.updateView(width, height);
+      frame_width_ = width;
+      frame_height_ = height;
   }
 
   // A map to track visibility state for each material and cell
@@ -1028,6 +1062,8 @@ public:
 
   GLFWwindow* window_ {nullptr};
   GLuint texture_;
+  GLuint shader_prog_id_;
+  GLuint empty_vao_;
 
   OpenMCPlotter& openmc_plotter_ {OpenMCPlotter::get_instance()};
   Camera camera_;
