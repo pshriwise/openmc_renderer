@@ -17,19 +17,13 @@ find_package(OpenMC REQUIRED)
 # Find Imgui
 add_subdirectory(vendor/imguiwrap)
 
-
 # Find the required packages
-find_package(OpenGL REQUIRED)
-find_package(GLUT REQUIRED)
 find_package(glfw3 REQUIRED)
 
-add_executable(omc-render main.cpp)
-
-target_link_libraries(omc-render PUBLIC OpenMC::libopenmc OpenGL::GL GLUT::GLUT glfw GLU imguiwrap)
+add_executable(omc-render main.cpp vendor/glad/src/glad.c)
+target_compile_definitions(omc-render PUBLIC IMGUI_IMPL_OPENGL_LOADER_CUSTOM)
+target_include_directories(omc-render PUBLIC vendor/glad/include)
+target_link_libraries(omc-render PUBLIC OpenMC::libopenmc glfw imguiwrap)
 
 target_compile_features(omc-render PUBLIC cxx_std_14)
 set(CMAKE_CXX_FLAGS "-pedantic-errors")
-
-
-
-

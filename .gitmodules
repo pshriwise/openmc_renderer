@@ -4,3 +4,6 @@
 [submodule "vendor/imguiwrap"]
 	path = vendor/imguiwrap
 	url = https://github.com/kfsone/imguiwrap.git
+[submodule "vendor/glad"]
+	path = vendor/glad
+	url = https://github.com/nuclearkevin/glad_ogl_410.git
