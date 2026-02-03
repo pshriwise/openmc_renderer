@@ -38,12 +38,12 @@ def main():
 
     help_action = QtGui.QAction("Controls", window)
     help_action.setShortcuts([QtGui.QKeySequence.HelpContents, QtGui.QKeySequence("Shift+/")])
-    help_action.triggered.connect(lambda: _show_help(window))
 
     help_menu = window.menuBar().addMenu("&Help")
     help_menu.addAction(help_action)
 
     gl_widget = GLPlotWidget(plotter)
+    help_action.triggered.connect(gl_widget.toggle_help_overlay)
     window.setCentralWidget(gl_widget)
 
     materials_dock = QtWidgets.QDockWidget("Visibility", window)
@@ -367,44 +367,6 @@ def _on_diffuse_change(value, label, plotter, gl_widget):
     plotter.set_diffuse_fraction(diffuse)
     gl_widget.request_final_render()
 
-
-def _show_help(parent):
-    dialog = QtWidgets.QDialog(parent)
-    dialog.setWindowTitle("OpenMC Renderer Controls")
-    dialog.resize(520, 480)
-
-    layout = QtWidgets.QVBoxLayout(dialog)
-    text = QtWidgets.QTextBrowser(dialog)
-    text.setOpenExternalLinks(False)
-    text.setReadOnly(True)
-    text.setText(
-        """
-<b>Camera Controls</b><br>
-Left drag: Orbit camera<br>
-Right drag: Pan camera<br>
-Mouse wheel: Zoom<br>
-Camera presets: Iso, +/-X, +/-Y, +/-Z buttons<br>
-<br>
-<b>Light Controls</b><br>
-Light follows camera: toggles light to camera position<br>
-Light control mode: left drag rotates light, right drag changes distance<br>
-Mouse wheel changes light distance when light control mode is active<br>
-<br>
-<b>Display</b><br>
-Color by: switch between material and cell coloring<br>
-Visibility list: toggle per material/cell<br>
-Color swatch: edit per material/cell color<br>
-<br>
-Shortcuts: F1 or ? to open this help
-"""
-    )
-    layout.addWidget(text)
-
-    close_btn = QtWidgets.QPushButton("Close", dialog)
-    close_btn.clicked.connect(dialog.accept)
-    layout.addWidget(close_btn)
-
-    dialog.exec()
 
 if __name__ == "__main__":
     raise SystemExit(main())

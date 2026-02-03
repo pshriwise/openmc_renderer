@@ -40,8 +40,8 @@ class OrbitCamera:
         return forward, right, up
 
     def orbit(self, dx, dy):
-        self.azimuth += dx * self.rotate_speed
-        self.elevation += dy * self.rotate_speed
+        self.azimuth -= dx * self.rotate_speed
+        self.elevation -= dy * self.rotate_speed
         max_e = math.radians(89.0)
         self.elevation = max(-max_e, min(max_e, self.elevation))
 
@@ -50,7 +50,7 @@ class OrbitCamera:
             return
         _, right, up = self.view_vectors()
         scale = 2.0 * self.distance * math.tan(math.radians(self.fov) * 0.5) / viewport_height
-        self.target += (-right * dx + up * dy) * scale * self.pan_speed
+        self.target += (-right * dx - up * dy) * scale * self.pan_speed
 
     def zoom(self, delta):
         self.distance *= (1.0 - delta * self.zoom_speed)

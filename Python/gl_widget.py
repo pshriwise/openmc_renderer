@@ -68,6 +68,51 @@ class GLPlotWidget(QOpenGLWidget):
         self._light_azimuth = self._camera.azimuth
         self._light_elevation = self._camera.elevation
 
+        self._help_overlay = QtWidgets.QFrame(self)
+        self._help_overlay.setVisible(False)
+        self._help_overlay.setFocusPolicy(QtCore.Qt.StrongFocus)
+        self._help_overlay.setAttribute(QtCore.Qt.WA_StyledBackground, True)
+        self._help_overlay.setStyleSheet(
+            "QFrame { background-color: rgba(0, 0, 0, 200); color: white; }"
+        )
+        self._help_overlay.installEventFilter(self)
+
+        overlay_layout = QtWidgets.QVBoxLayout(self._help_overlay)
+        overlay_layout.setContentsMargins(24, 24, 24, 24)
+
+        title = QtWidgets.QLabel("OpenMC Renderer Controls", self._help_overlay)
+        title.setStyleSheet("font-size: 18px; font-weight: bold;")
+        overlay_layout.addWidget(title)
+
+        help_text = QtWidgets.QTextBrowser(self._help_overlay)
+        help_text.setFrameStyle(QtWidgets.QFrame.NoFrame)
+        help_text.setOpenExternalLinks(False)
+        help_text.setStyleSheet("background: transparent; color: white;")
+        help_text.setHtml(
+            """
+<b>Camera Controls</b><br>
+Left drag: Orbit camera<br>
+Right drag: Pan camera<br>
+Mouse wheel: Zoom<br>
+Camera presets: Iso, +/-X, +/-Y, +/-Z buttons<br>
+<br>
+<b>Light Controls</b><br>
+Light follows camera: toggles light to camera position<br>
+Light control mode: left drag rotates light, right drag changes distance<br>
+Mouse wheel changes light distance when light control mode is active<br>
+<br>
+<b>Display</b><br>
+Color by: switch between material and cell coloring<br>
+Visibility list: toggle per material/cell<br>
+Color swatch: edit per material/cell color<br>
+"""
+        )
+        overlay_layout.addWidget(help_text, 1)
+
+        hint = QtWidgets.QLabel("Press ? or Esc to close", self._help_overlay)
+        hint.setStyleSheet("color: #dddddd;")
+        overlay_layout.addWidget(hint)
+
         self.setFocusPolicy(QtCore.Qt.StrongFocus)
 
     def minimumSizeHint(self):
@@ -94,6 +139,18 @@ class GLPlotWidget(QOpenGLWidget):
             self._dirty = True
             self._idle_timer.start(250)
             self._request_redraw()
+        self._help_overlay.setGeometry(self.rect())
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._help_overlay.setGeometry(self.rect())
+
+    def eventFilter(self, obj, event):
+        if obj == self._help_overlay:
+            if event.type() in (QtCore.QEvent.MouseButtonPress, QtCore.QEvent.KeyPress):
+                self.toggle_help_overlay()
+                return True
+        return super().eventFilter(obj, event)
 
     def paintGL(self):
         glClear(GL_COLOR_BUFFER_BIT)
@@ -187,6 +244,15 @@ class GLPlotWidget(QOpenGLWidget):
     def request_final_render(self):
         self._request_final_render()
 
+    def toggle_help_overlay(self):
+        if self._help_overlay.isVisible():
+            self._help_overlay.hide()
+        else:
+            self._help_overlay.setGeometry(self.rect())
+            self._help_overlay.show()
+            self._help_overlay.raise_()
+            self._help_overlay.setFocus(QtCore.Qt.ActiveWindowFocusReason)
+
     def set_light_follows_camera(self, enabled):
         self._light_follows_camera = bool(enabled)
         if enabled:
@@ -234,6 +300,9 @@ class GLPlotWidget(QOpenGLWidget):
         glEnd()
 
     def mousePressEvent(self, event):
+        if self._help_overlay.isVisible():
+            event.accept()
+            return
         self._last_pos = event.position()
         self._buttons.add(event.button())
         event.accept()
@@ -254,6 +323,9 @@ class GLPlotWidget(QOpenGLWidget):
         self._camera.set_speeds(rotate_speed=rotate, pan_speed=pan, zoom_speed=zoom)
 
     def mouseReleaseEvent(self, event):
+        if self._help_overlay.isVisible():
+            event.accept()
+            return
         if event.button() in self._buttons:
             self._buttons.remove(event.button())
         if not self._buttons:
@@ -261,6 +333,9 @@ class GLPlotWidget(QOpenGLWidget):
         event.accept()
 
     def mouseMoveEvent(self, event):
+        if self._help_overlay.isVisible():
+            event.accept()
+            return
         if self._last_pos is None:
             self._last_pos = event.position()
             return
@@ -291,6 +366,9 @@ class GLPlotWidget(QOpenGLWidget):
         self._last_pos = event.position()
 
     def wheelEvent(self, event):
+        if self._help_overlay.isVisible():
+            event.accept()
+            return
         delta = event.angleDelta().y() / 120.0
         if self._light_control_mode and not self._light_follows_camera:
             self._light_distance *= 1.0 - delta * 0.1
@@ -300,6 +378,20 @@ class GLPlotWidget(QOpenGLWidget):
         else:
             self._camera.zoom(delta)
             self._request_interactive_render()
+
+    def keyPressEvent(self, event):
+        key = event.key()
+        if key == QtCore.Qt.Key_F1 or (
+            key == QtCore.Qt.Key_Slash and event.modifiers() & QtCore.Qt.ShiftModifier
+        ):
+            self.toggle_help_overlay()
+            event.accept()
+            return
+        if key == QtCore.Qt.Key_Escape and self._help_overlay.isVisible():
+            self.toggle_help_overlay()
+            event.accept()
+            return
+        super().keyPressEvent(event)
 
     def closeEvent(self, event):
         if self._texture is not None:
