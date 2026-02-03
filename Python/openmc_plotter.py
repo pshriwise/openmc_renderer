@@ -122,6 +122,7 @@ class OpenMCPlotter:
     def create_image(self):
         if self._plot is None:
             return self._fallback_image()
+        self._plot.update_view()
         return self._plot.create_image()
 
     def finalize(self):
