@@ -25,6 +25,25 @@ sudo apt-get install cmake
 sudo apt-get install build-essential
 ```
 
+### Ubuntu System Dependencies (Python Renderer)
+```bash
+# Python runtime
+sudo apt-get install python3 python3-venv python3-pip
+
+# Qt + OpenGL runtime deps (needed on minimal installs)
+sudo apt-get install libgl1 libegl1 libx11-xcb1 libxkbcommon-x11-0 \\
+  libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 \\
+  libxcb-render-util0 libxcb-xfixes0 libxcb-xinerama0
+```
+
+### Python Packages (Python Renderer)
+```bash
+python3 -m pip install -r Python/requirements.txt
+```
+
+The Python renderer also requires the OpenMC Python package + shared library
+from the branch noted above to be importable at runtime.
+
 ## Controls
 
 ### Camera Controls
