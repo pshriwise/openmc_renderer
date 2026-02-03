@@ -13,6 +13,9 @@ except Exception as exc:  # pragma: no cover - fallback for missing openmc/lib
 
 
 class OpenMCPlotter:
+    COLOR_BY_MATERIAL = plotlib.PhongPlot.COLOR_BY_MATERIAL if OPENMC_AVAILABLE else 0
+    COLOR_BY_CELL = plotlib.PhongPlot.COLOR_BY_CELL if OPENMC_AVAILABLE else 1
+
     def __init__(self, args=None, width=800, height=600):
         self._width = int(width)
         self._height = int(height)
@@ -23,7 +26,7 @@ class OpenMCPlotter:
             if not omlib.is_initialized:
                 omlib.init(args=args or [], output=True)
             self._plot = plotlib.PhongPlot()
-            self._plot.set_color_by(plotlib.PhongPlot.COLOR_BY_MATERIAL)
+            self._plot.set_color_by(self.COLOR_BY_MATERIAL)
             self._plot.set_pixels(self._width, self._height)
             self._plot.set_default_colors()
             self._plot.set_all_opaque()
@@ -74,10 +77,47 @@ class OpenMCPlotter:
         mats.sort(key=lambda item: item[0])
         return mats
 
-    def set_material_visibility(self, material_id, visible):
+    def cell_list(self):
+        if not self._available:
+            return []
+        cells = []
+        for cell_id in omlib.cells:
+            cell = omlib.cells[cell_id]
+            name = cell.name
+            label = name if name else ""
+            cells.append((cell_id, label))
+        cells.sort(key=lambda item: item[0])
+        return cells
+
+    def set_color_by(self, mode):
         if self._plot is None:
             return
-        self._plot.set_visibility(int(material_id), bool(visible))
+        self._plot.set_color_by(int(mode))
+        self._plot.set_default_colors()
+        self._plot.set_all_opaque()
+
+    def set_visibility(self, domain_id, visible):
+        if self._plot is None:
+            return
+        self._plot.set_visibility(int(domain_id), bool(visible))
+
+    def get_color(self, domain_id):
+        if self._plot is None:
+            return (128, 128, 128)
+        return self._plot.get_color(int(domain_id))
+
+    def set_color(self, domain_id, color):
+        if self._plot is None:
+            return
+        self._plot.set_color(int(domain_id), color)
+
+    def set_material_visibility(self, material_id, visible):
+        self.set_visibility(material_id, visible)
+
+    def set_diffuse_fraction(self, value):
+        if self._plot is None:
+            return
+        self._plot.set_diffuse_fraction(float(value))
 
     def create_image(self):
         if self._plot is None:

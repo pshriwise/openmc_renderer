@@ -62,6 +62,12 @@ class GLPlotWidget(QOpenGLWidget):
         self._throttle_timer.setSingleShot(True)
         self._throttle_timer.timeout.connect(self._do_update)
 
+        self._light_follows_camera = True
+        self._light_control_mode = False
+        self._light_distance = self._camera.distance
+        self._light_azimuth = self._camera.azimuth
+        self._light_elevation = self._camera.elevation
+
         self.setFocusPolicy(QtCore.Qt.StrongFocus)
 
     def minimumSizeHint(self):
@@ -106,12 +112,17 @@ class GLPlotWidget(QOpenGLWidget):
     def _sync_plotter_camera(self):
         pos = self._camera.position()
         _, _, up = self._camera.view_vectors()
+        if self._light_follows_camera:
+            self._sync_light_from_camera()
+            light_pos = pos
+        else:
+            light_pos = self._light_position()
         self._plotter.set_camera(
             position=pos,
             look_at=self._camera.target,
             up=up,
             fov=self._camera.fov,
-            light_position=pos,
+            light_position=light_pos,
         )
 
     def _upload_texture(self, image):
@@ -176,6 +187,31 @@ class GLPlotWidget(QOpenGLWidget):
     def request_final_render(self):
         self._request_final_render()
 
+    def set_light_follows_camera(self, enabled):
+        self._light_follows_camera = bool(enabled)
+        if enabled:
+            self._sync_light_from_camera()
+        self._request_final_render()
+
+    def set_light_control_mode(self, enabled):
+        self._light_control_mode = bool(enabled)
+        self.setCursor(QtCore.Qt.CrossCursor if self._light_control_mode else QtCore.Qt.ArrowCursor)
+
+    def _light_position(self):
+        cos_e = np.cos(self._light_elevation)
+        sin_e = np.sin(self._light_elevation)
+        cos_a = np.cos(self._light_azimuth)
+        sin_a = np.sin(self._light_azimuth)
+        x = self._camera.target[0] + self._light_distance * cos_e * cos_a
+        y = self._camera.target[1] + self._light_distance * cos_e * sin_a
+        z = self._camera.target[2] + self._light_distance * sin_e
+        return np.array([x, y, z], dtype=np.float64)
+
+    def _sync_light_from_camera(self):
+        self._light_distance = self._camera.distance
+        self._light_azimuth = self._camera.azimuth
+        self._light_elevation = self._camera.elevation
+
     def _draw_textured_quad(self):
         if self._texture is None:
             return
@@ -202,6 +238,21 @@ class GLPlotWidget(QOpenGLWidget):
         self._buttons.add(event.button())
         event.accept()
 
+    def set_isometric_view(self):
+        self._camera.set_isometric_view()
+        if self._light_follows_camera:
+            self._sync_light_from_camera()
+        self._request_final_render()
+
+    def set_axis_view(self, axis, negative=False):
+        self._camera.set_axis_view(axis, negative=negative)
+        if self._light_follows_camera:
+            self._sync_light_from_camera()
+        self._request_final_render()
+
+    def set_camera_speeds(self, rotate=None, pan=None, zoom=None):
+        self._camera.set_speeds(rotate_speed=rotate, pan_speed=pan, zoom_speed=zoom)
+
     def mouseReleaseEvent(self, event):
         if event.button() in self._buttons:
             self._buttons.remove(event.button())
@@ -217,19 +268,38 @@ class GLPlotWidget(QOpenGLWidget):
         dx = event.position().x() - self._last_pos.x()
         dy = event.position().y() - self._last_pos.y()
 
-        if QtCore.Qt.LeftButton in self._buttons:
-            self._camera.orbit(dx, dy)
-            self._request_interactive_render()
-        elif QtCore.Qt.RightButton in self._buttons:
-            self._camera.pan(dx, dy, self.height())
-            self._request_interactive_render()
+        if self._light_control_mode:
+            if QtCore.Qt.LeftButton in self._buttons:
+                self._light_azimuth += dx * 0.005
+                self._light_elevation += dy * 0.005
+                max_e = np.radians(89.0)
+                self._light_elevation = max(-max_e, min(max_e, self._light_elevation))
+                self._request_interactive_render()
+            elif QtCore.Qt.RightButton in self._buttons:
+                self._light_distance *= 1.0 + (dy * 0.01)
+                if self._light_distance < 1.0:
+                    self._light_distance = 1.0
+                self._request_interactive_render()
+        else:
+            if QtCore.Qt.LeftButton in self._buttons:
+                self._camera.orbit(dx, dy)
+                self._request_interactive_render()
+            elif QtCore.Qt.RightButton in self._buttons:
+                self._camera.pan(dx, dy, self.height())
+                self._request_interactive_render()
 
         self._last_pos = event.position()
 
     def wheelEvent(self, event):
         delta = event.angleDelta().y() / 120.0
-        self._camera.zoom(delta)
-        self._request_interactive_render()
+        if self._light_control_mode and not self._light_follows_camera:
+            self._light_distance *= 1.0 - delta * 0.1
+            if self._light_distance < 1.0:
+                self._light_distance = 1.0
+            self._request_interactive_render()
+        else:
+            self._camera.zoom(delta)
+            self._request_interactive_render()
 
     def closeEvent(self, event):
         if self._texture is not None:
