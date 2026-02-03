@@ -926,8 +926,8 @@ public:
     // Position the window in the right portion of the screen
     const float windowWidth = ImGui::GetIO().DisplaySize.x;
     const float windowHeight = ImGui::GetIO().DisplaySize.y;
-    const float settingsWidth = 300.0f;
-    const float settingsHeight = 180.0f;  // Increased height for new control
+    const float settingsWidth = 0.0f;
+    const float settingsHeight = 0.0f;  // Increased height for new control
 
     // Position in the right third of the screen, below the top
     ImGui::SetNextWindowPos(
@@ -1165,5 +1165,3 @@ public:
       ImGui::End();
   }
 };
-
-

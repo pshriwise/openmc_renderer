@@ -2,6 +2,7 @@
 #include <memory>
 
 #include "openmc/capi.h"
+#include "openmc/error.h"
 #include "openmc/material.h"
 #include "openmc/plot.h"
 #include "openmc/settings.h"
@@ -35,6 +36,8 @@ public:
     plot_ = std::make_unique<openmc::PhongPlot>();
 
     set_plot_defaults();
+
+    //    openmc::fatal_error_callbacks.push_back(std::bind(&openmc::PhongPlot::print_info, plot_.get()));
 
     if (!plot_) {
       throw std::runtime_error("Plot zero is not a PhongPlot");
