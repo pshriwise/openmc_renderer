@@ -64,3 +64,35 @@ sudo apt-get install build-essential
   - Adjust pan sensitivity
   - Adjust zoom sensitivity
   - Adjust rotation sensitivity
+
+## Qt/Python Renderer (Experimental)
+
+There is a Python + Qt viewer under `Python/` that can be embedded as a pop-up
+window in a larger Qt application. It uses PySide6 for the UI, PyOpenGL for
+display, and the OpenMC shared library for rendering via a small C API bridge.
+This makes it easy to host the OpenMC renderer as a dialog or dockable panel
+inside your own Qt tools without running a separate process.
+
+### Embed Example (PySide6)
+
+```python
+from PySide6 import QtWidgets
+from Python.openmc_plotter import OpenMCPlotter
+from Python.gl_widget import GLPlotWidget
+
+class OpenMCRenderDialog(QtWidgets.QDialog):
+    def __init__(self, parent=None, openmc_args=None):
+        super().__init__(parent)
+        self.setWindowTitle("OpenMC Renderer")
+        self.resize(900, 700)
+
+        self.plotter = OpenMCPlotter(args=openmc_args or [])
+        self.gl_widget = GLPlotWidget(self.plotter)
+
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.addWidget(self.gl_widget)
+
+# Usage in an existing Qt app:
+# dlg = OpenMCRenderDialog(parent=self)
+# dlg.show()
+```
