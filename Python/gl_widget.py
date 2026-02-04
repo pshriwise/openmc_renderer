@@ -105,6 +105,7 @@ Mouse wheel changes light distance when light control mode is active<br>
 Color by: switch between material and cell coloring<br>
 Visibility list: toggle per material/cell<br>
 Color swatch: edit per material/cell color<br>
+Save PNG: Ctrl+S / Cmd+S<br>
 """
         )
         overlay_layout.addWidget(help_text, 1)
@@ -253,6 +254,44 @@ Color swatch: edit per material/cell color<br>
             self._help_overlay.raise_()
             self._help_overlay.setFocus(QtCore.Qt.ActiveWindowFocusReason)
 
+    def save_screenshot(self):
+        image = self.grabFramebuffer()
+        if image.isNull():
+            QtWidgets.QMessageBox.warning(
+                self,
+                "Save PNG",
+                "Failed to capture the current frame.",
+            )
+            return
+
+        default_dir = QtCore.QStandardPaths.writableLocation(
+            QtCore.QStandardPaths.PicturesLocation
+        )
+        if not default_dir:
+            default_dir = QtCore.QDir.homePath()
+        timestamp = QtCore.QDateTime.currentDateTime().toString(
+            "yyyyMMdd_HHmmss"
+        )
+        default_name = f"openmc_render_{timestamp}.png"
+        default_path = QtCore.QDir(default_dir).filePath(default_name)
+
+        filename, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self,
+            "Save Rendered Image",
+            default_path,
+            "PNG Images (*.png)",
+        )
+        if not filename:
+            return
+        if not filename.lower().endswith(".png"):
+            filename += ".png"
+        if not image.save(filename, "PNG"):
+            QtWidgets.QMessageBox.warning(
+                self,
+                "Save PNG",
+                f"Failed to save image to:\n{filename}",
+            )
+
     def set_light_follows_camera(self, enabled):
         self._light_follows_camera = bool(enabled)
         if enabled:
@@ -381,6 +420,10 @@ Color swatch: edit per material/cell color<br>
 
     def keyPressEvent(self, event):
         key = event.key()
+        if event.matches(QtGui.QKeySequence.Save):
+            self.save_screenshot()
+            event.accept()
+            return
         if key == QtCore.Qt.Key_F1 or (
             key == QtCore.Qt.Key_Slash and event.modifiers() & QtCore.Qt.ShiftModifier
         ):

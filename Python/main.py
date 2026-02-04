@@ -36,6 +36,11 @@ def main():
     window = QtWidgets.QMainWindow()
     window.setWindowTitle("OpenMC Renderer (PySide6)")
 
+    file_menu = window.menuBar().addMenu("&File")
+    save_action = QtGui.QAction("Save PNG", window)
+    save_action.setShortcut(QtGui.QKeySequence.Save)
+    file_menu.addAction(save_action)
+
     help_action = QtGui.QAction("Controls", window)
     help_action.setShortcuts([QtGui.QKeySequence.HelpContents, QtGui.QKeySequence("Shift+/")])
 
@@ -43,6 +48,7 @@ def main():
     help_menu.addAction(help_action)
 
     gl_widget = GLPlotWidget(plotter)
+    save_action.triggered.connect(gl_widget.save_screenshot)
     help_action.triggered.connect(gl_widget.toggle_help_overlay)
     window.setCentralWidget(gl_widget)
 
