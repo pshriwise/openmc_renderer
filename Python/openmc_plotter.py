@@ -13,8 +13,8 @@ except Exception as exc:  # pragma: no cover - fallback for missing openmc/lib
 
 
 class OpenMCPlotter:
-    COLOR_BY_MATERIAL = plotlib.PhongPlot.COLOR_BY_MATERIAL if OPENMC_AVAILABLE else 0
-    COLOR_BY_CELL = plotlib.PhongPlot.COLOR_BY_CELL if OPENMC_AVAILABLE else 1
+    COLOR_BY_MATERIAL = plotlib.SolidRayTracePlot.COLOR_BY_MATERIAL if OPENMC_AVAILABLE else 0
+    COLOR_BY_CELL = plotlib.SolidRayTracePlot.COLOR_BY_CELL if OPENMC_AVAILABLE else 1
 
     def __init__(self, args=None, width=800, height=600):
         self._width = int(width)
@@ -25,7 +25,7 @@ class OpenMCPlotter:
         if self._available:
             if not omlib.is_initialized:
                 omlib.init(args=args or [], output=True)
-            self._plot = plotlib.PhongPlot()
+            self._plot = plotlib.SolidRayTracePlot()
             self._plot.set_color_by(self.COLOR_BY_MATERIAL)
             self._plot.set_pixels(self._width, self._height)
             self._plot.set_default_colors()
